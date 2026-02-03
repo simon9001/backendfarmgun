@@ -1,0 +1,24 @@
+src/routes/public.ts(20,11): error TS6196: 'ServiceWithMedia' is declared but never used.
+src/routes/public.ts(253,27): error TS2352: Conversion of type '{ id: any; public_id: any; url: any; type: any; alt_text: any; width: any; height: any; }[]' to type 'FeaturedMedia' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: any; public_id: any; url: any; type: any; alt_text: any; width: any; height: any; }[]' is missing the following properties from type 'FeaturedMedia': id, public_id, url
+src/routes/public.ts(405,27): error TS2352: Conversion of type '{ id: any; public_id: any; url: any; type: any; alt_text: any; width: any; height: any; }[]' to type 'FeaturedMedia' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: any; public_id: any; url: any; type: any; alt_text: any; width: any; height: any; }[]' is missing the following properties from type 'FeaturedMedia': id, public_id, url
+src/routes/public.ts(605,23): error TS2352: Conversion of type '{ id: any; public_id: any; url: any; alt_text: any; }[]' to type 'FeaturedMedia' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: any; public_id: any; url: any; alt_text: any; }[]' is missing the following properties from type 'FeaturedMedia': id, public_id, url
+src/routes/public.ts(688,27): error TS2352: Conversion of type '{ id: any; public_id: any; url: any; type: any; alt_text: any; width: any; height: any; }[]' to type 'FeaturedMedia' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: any; public_id: any; url: any; type: any; alt_text: any; width: any; height: any; }[]' is missing the following properties from type 'FeaturedMedia': id, public_id, url
+src/routes/public.ts(874,27): error TS2352: Conversion of type '{ id: any; public_id: any; url: any; alt_text: any; }[]' to type 'FeaturedMedia' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: any; public_id: any; url: any; alt_text: any; }[]' is missing the following properties from type 'FeaturedMedia': id, public_id, url
+src/routes/public.ts(1008,88): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1020,85): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1032,88): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1044,88): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1056,84): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1122,90): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1157,87): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1192,90): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1229,86): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1318,88): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1330,90): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/utils/validation.ts(1,19): error TS2307: Cannot find module 'zod' or its corresponding type declarations.
+src/utils/validation.ts(15,11): error TS7006: Parameter 'data' implicitly has an 'any' type.

@@ -1,0 +1,395 @@
+import { Context } from 'hono';
+import { supabase } from '../db/supabaseClient.js';
+import { bookingSchema } from '../utils/validation.js';
+import { MpesaService } from '../utils/mpesa.js';
+
+export class BookingsController {
+  static async getAvailableSlots(c: Context) {
+    try {
+      const { date, service_id } = c.req.query();
+
+      if (!date || !service_id) {
+        return c.json({ error: 'Date and service_id are required' }, 400);
+      }
+
+      // Get service duration
+      const { data: service, error: serviceError } = await supabase
+        .from('services')
+        .select('duration_mins')
+        .eq('id', service_id)
+        .single();
+
+      if (serviceError || !service) {
+        return c.json({ error: 'Service not found' }, 404);
+      }
+
+      // Get admin availability
+      const adminId = await BookingsController.getAdminId();
+      if (!adminId) {
+        return c.json({ error: 'System administrator not found' }, 500);
+      }
+
+      // Get existing bookings for the date
+      const { data: existingBookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('start_time, end_time, status')
+        .eq('admin_id', adminId)
+        .eq('date', date)
+        .in('status', ['pending', 'paid', 'confirmed']);
+
+      if (bookingsError) throw bookingsError;
+
+      // Generate time slots (9 AM to 5 PM, 30-minute intervals)
+      const slots: Array<{ time: string; available: boolean }> = [];
+      const startHour = 9;
+      const endHour = 17;
+      const slotDuration = 30; // minutes
+
+      for (let hour = startHour; hour < endHour; hour++) {
+        for (let minute = 0; minute < 60; minute += slotDuration) {
+          const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+
+          // Check if slot is available (not overlapping with existing bookings)
+          const isAvailable = !existingBookings?.some(booking => {
+            const bookingStart = booking.start_time;
+            const bookingEnd = booking.end_time;
+            const slotEnd = BookingsController.addMinutes(time, service.duration_mins);
+
+            return BookingsController.timeOverlap(time, slotEnd, bookingStart, bookingEnd);
+          });
+
+          slots.push({
+            time,
+            available: isAvailable,
+          });
+        }
+      }
+
+      return c.json({ slots });
+    } catch (error) {
+      console.error('Get slots error:', error);
+      return c.json({ error: 'Failed to get available slots' }, 500);
+    }
+  }
+
+  static async createBooking(c: Context) {
+    try {
+      const user = c.get('user');
+      const body = await c.req.json();
+      const validated = bookingSchema.parse(body);
+
+      // Get service details
+      const { data: service, error: serviceError } = await supabase
+        .from('services')
+        .select('duration_mins, price, name')
+        .eq('id', validated.service_id)
+        .single();
+
+      if (serviceError || !service) {
+        return c.json({ error: 'Service not found' }, 404);
+      }
+
+      // Calculate end time
+      const endTime = BookingsController.addMinutes(validated.start_time, service.duration_mins);
+
+      // Check for conflicts
+      const adminId = await BookingsController.getAdminId();
+      if (!adminId) {
+        return c.json({ error: 'System administrator not found' }, 500);
+      }
+
+      const { data: conflictingBooking, error: conflictError } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('admin_id', adminId)
+        .eq('date', validated.date)
+        .or(`and(start_time.lte.${validated.start_time},end_time.gt.${validated.start_time}),and(start_time.lt.${endTime},end_time.gte.${endTime})`)
+        .in('status', ['pending', 'paid', 'confirmed'])
+        .maybeSingle();
+
+      if (conflictError) throw conflictError;
+      if (conflictingBooking) {
+        return c.json({ error: 'Time slot is not available' }, 409);
+      }
+
+      // 1. Initiate M-Pesa STK Push
+      let stkResponse;
+      try {
+        stkResponse = await MpesaService.initiateStkPush(
+          validated.payment_phone,
+          service.price,
+          `BC-${Date.now()}`,
+          `Consultation: ${service.name}`
+        );
+      } catch (mpesaError: any) {
+        const errorData = mpesaError.response?.data || mpesaError.message;
+        console.error('M-Pesa initiation failed:', errorData);
+        return c.json({
+          error: 'Failed to initiate M-Pesa payment.',
+          details: errorData,
+          message: 'Please ensure your M-Pesa credentials in .env are correct and the phone number is valid.'
+        }, 400);
+      }
+
+      if (stkResponse.ResponseCode !== '0') {
+        return c.json({ error: 'M-Pesa rejected the request: ' + stkResponse.CustomerMessage }, 400);
+      }
+
+      // 2. Create booking (Pending Payment)
+      const { data: booking, error: bookingError } = await supabase
+        .from('bookings')
+        .insert({
+          user_id: user.userId,
+          admin_id: adminId,
+          service_id: validated.service_id,
+          date: validated.date,
+          start_time: validated.start_time,
+          end_time: endTime,
+          status: 'pending',
+          user_notes: validated.user_notes
+        })
+        .select(`
+          *,
+          service:services(*),
+          user:users!bookings_user_id_fkey(name, email, phone)
+        `)
+        .single();
+
+      if (bookingError) {
+        console.error('Supabase booking error:', bookingError);
+        return c.json({ error: 'Failed to create booking record after payment initiation.' }, 500);
+      }
+
+      // 3. Create payment record with CheckoutRequestID
+      await supabase
+        .from('payments')
+        .insert({
+          booking_id: booking.id,
+          amount: service.price,
+          status: 'pending',
+          transaction_id: stkResponse.CheckoutRequestID // Use this to track the callback
+        });
+
+      return c.json({
+        message: 'STK Push sent successfully. Please enter your PIN on your phone to complete booking.',
+        booking,
+        checkout_request_id: stkResponse.CheckoutRequestID
+      }, 201);
+    } catch (error: any) {
+      console.error('Create booking error:', error);
+      const message = error.message || 'Failed to create booking';
+      return c.json({ error: message }, 400);
+    }
+  }
+
+  static async getUserBookings(c: Context) {
+    try {
+      const user = c.get('user');
+      const { status, limit = '20', offset = '0' } = c.req.query();
+
+      // Convert string parameters to numbers with validation
+      const limitNum = parseInt(limit, 10);
+      const offsetNum = parseInt(offset, 10);
+
+      if (isNaN(limitNum) || isNaN(offsetNum)) {
+        return c.json({ error: 'Invalid limit or offset parameter' }, 400);
+      }
+
+      let query = supabase
+        .from('bookings')
+        .select(`
+          *,
+          service:services(*),
+          payments(*)
+        `)
+        .eq('user_id', user.userId)
+        .order('date', { ascending: false })
+        .order('start_time', { ascending: false })
+        .range(offsetNum, offsetNum + limitNum - 1);
+
+      if (status) {
+        query = query.eq('status', status);
+      }
+
+      const { data: bookings, error } = await query;
+
+      if (error) throw error;
+
+      return c.json({ bookings: bookings || [] });
+    } catch (error) {
+      console.error('Get bookings error:', error);
+      return c.json({ error: 'Failed to fetch bookings' }, 500);
+    }
+  }
+
+  static async getBookingById(c: Context) {
+    try {
+      const user = c.get('user');
+      const id = c.req.param('id');
+
+      const { data: booking, error } = await supabase
+        .from('bookings')
+        .select(`
+          *,
+          service:services(*),
+          payments(*),
+          user:users!bookings_user_id_fkey(*)
+        `)
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!booking) {
+        return c.json({ error: 'Booking not found' }, 404);
+      }
+
+      // Check authorization
+      if (booking.user_id !== user.userId && user.role !== 'admin') {
+        return c.json({ error: 'Unauthorized' }, 403);
+      }
+
+      return c.json({ booking });
+    } catch (error) {
+      console.error('Get booking error:', error);
+      return c.json({ error: 'Failed to fetch booking' }, 500);
+    }
+  }
+
+  static async updateBookingStatus(c: Context) {
+    try {
+      const user = c.get('user');
+      if (user.role !== 'admin') {
+        return c.json({ error: 'Admin access required' }, 403);
+      }
+
+      const id = c.req.param('id');
+      const { status, meeting_link } = await c.req.json();
+
+      interface UpdateBookingInput {
+        status?: string;
+        meeting_link?: string;
+      }
+      const updateData: UpdateBookingInput = {};
+      if (status) updateData.status = status;
+      if (meeting_link) updateData.meeting_link = meeting_link;
+
+      const { data: booking, error } = await supabase
+        .from('bookings')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      if (!booking) {
+        return c.json({ error: 'Booking not found' }, 404);
+      }
+
+      // Create notification for user
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: booking.user_id,
+          type: 'booking_confirmation',
+          message: `Your booking status has been updated to ${status}`,
+        });
+
+      return c.json({ booking });
+    } catch (error) {
+      console.error('Update booking error:', error);
+      return c.json({ error: 'Failed to update booking' }, 400);
+    }
+  }
+
+  static async cancelBooking(c: Context) {
+    try {
+      const user = c.get('user');
+      const id = c.req.param('id');
+
+      const { data: booking, error: fetchError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !booking) {
+        return c.json({ error: 'Booking not found' }, 404);
+      }
+
+      // Check authorization
+      if (booking.user_id !== user.userId && user.role !== 'admin') {
+        return c.json({ error: 'Unauthorized' }, 403);
+      }
+
+      // Only allow cancellation if booking is not completed
+      if (booking.status === 'completed') {
+        return c.json({ error: 'Cannot cancel completed booking' }, 400);
+      }
+
+      const { data: updatedBooking, error } = await supabase
+        .from('bookings')
+        .update({ status: 'cancelled' })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return c.json({ booking: updatedBooking });
+    } catch (error) {
+      console.error('Cancel booking error:', error);
+      return c.json({ error: 'Failed to cancel booking' }, 400);
+    }
+  }
+
+  private static addMinutes(time: string, minutes: number): string {
+    const [hoursStr, minsStr] = time.split(':');
+
+    // Handle undefined values
+    const hours = hoursStr ? parseInt(hoursStr, 10) : 0;
+    const mins = minsStr ? parseInt(minsStr, 10) : 0;
+
+    // Validate parsed values
+    if (isNaN(hours) || isNaN(mins)) {
+      throw new Error(`Invalid time format: ${time}`);
+    }
+
+    const date = new Date();
+    date.setHours(hours, mins + minutes);
+    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+  }
+
+  private static timeOverlap(start1: string, end1: string, start2: string, end2: string): boolean {
+    const toMinutes = (time: string) => {
+      const [hoursStr, minutesStr] = time.split(':');
+
+      // Handle undefined values
+      const hours = hoursStr ? parseInt(hoursStr, 10) : 0;
+      const minutes = minutesStr ? parseInt(minutesStr, 10) : 0;
+
+      // Validate parsed values
+      if (isNaN(hours) || isNaN(minutes)) {
+        throw new Error(`Invalid time format: ${time}`);
+      }
+
+      return hours * 60 + minutes;
+    };
+
+    const s1 = toMinutes(start1);
+    const e1 = toMinutes(end1);
+    const s2 = toMinutes(start2);
+    const e2 = toMinutes(end2);
+
+    return s1 < e2 && e1 > s2;
+  }
+
+  private static async getAdminId() {
+    const { data: admin } = await supabase
+      .from('users')
+      .select('id')
+      .eq('role', 'admin')
+      .limit(1)
+      .maybeSingle();
+    return admin?.id;
+  }
+}

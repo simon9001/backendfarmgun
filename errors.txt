@@ -1,0 +1,64 @@
+src/controllers/payments.ts(88,9): error TS6133: 'MerchantRequestID' is declared but its value is never read.
+src/controllers/payments.ts(92,9): error TS6133: 'TransactionDate' is declared but its value is never read.
+src/controllers/payments.ts(93,9): error TS6133: 'PhoneNumber' is declared but its value is never read.
+src/index.ts(4,28): error TS2835: Relative import paths need explicit file extensions in ECMAScript imports when '--moduleResolution' is 'node16' or 'nodenext'. Did you mean './routes/auth.js'?
+src/index.ts(5,31): error TS2835: Relative import paths need explicit file extensions in ECMAScript imports when '--moduleResolution' is 'node16' or 'nodenext'. Did you mean './routes/services.js'?
+src/index.ts(6,31): error TS2835: Relative import paths need explicit file extensions in ECMAScript imports when '--moduleResolution' is 'node16' or 'nodenext'. Did you mean './routes/bookings.js'?
+src/index.ts(7,31): error TS2835: Relative import paths need explicit file extensions in ECMAScript imports when '--moduleResolution' is 'node16' or 'nodenext'. Did you mean './routes/payments.js'?
+src/index.ts(8,36): error TS2835: Relative import paths need explicit file extensions in ECMAScript imports when '--moduleResolution' is 'node16' or 'nodenext'. Did you mean './routes/notifications.js'?
+src/index.ts(9,29): error TS2835: Relative import paths need explicit file extensions in ECMAScript imports when '--moduleResolution' is 'node16' or 'nodenext'. Did you mean './routes/admin.js'?
+src/index.ts(10,30): error TS2835: Relative import paths need explicit file extensions in ECMAScript imports when '--moduleResolution' is 'node16' or 'nodenext'. Did you mean './routes/public.js'?
+src/index.ts(11,29): error TS2835: Relative import paths need explicit file extensions in ECMAScript imports when '--moduleResolution' is 'node16' or 'nodenext'. Did you mean './routes/media.js'?
+src/index.ts(12,29): error TS2835: Relative import paths need explicit file extensions in ECMAScript imports when '--moduleResolution' is 'node16' or 'nodenext'. Did you mean './middleware/authMiddleware.js'?
+src/middleware/authMiddleware.ts(21,26): error TS7030: Not all code paths return a value.
+src/middleware/uploadMiddleware.ts(3,1): error TS6133: 'CloudinaryService' is declared but its value is never read.
+src/middleware/uploadMiddleware.ts(12,16): error TS6133: 'req' is declared but its value is never read.
+src/middleware/uploadMiddleware.ts(34,10): error TS7030: Not all code paths return a value.
+src/middleware/uploadMiddleware.ts(57,10): error TS7030: Not all code paths return a value.
+src/routes/public.ts(20,11): error TS6196: 'ServiceWithMedia' is declared but never used.
+src/routes/public.ts(82,27): error TS2352: Conversion of type '{ id: any; public_id: any; url: any; type: any; alt_text: any; width: any; height: any; }[]' to type 'FeaturedMedia' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: any; public_id: any; url: any; type: any; alt_text: any; width: any; height: any; }[]' is missing the following properties from type 'FeaturedMedia': id, public_id, url, type, and 3 more.
+src/routes/public.ts(239,27): error TS2352: Conversion of type '{ id: any; public_id: any; url: any; type: any; alt_text: any; width: any; height: any; }[]' to type 'FeaturedMedia' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: any; public_id: any; url: any; type: any; alt_text: any; width: any; height: any; }[]' is missing the following properties from type 'FeaturedMedia': id, public_id, url, type, and 3 more.
+src/routes/public.ts(391,27): error TS2352: Conversion of type '{ id: any; public_id: any; url: any; type: any; alt_text: any; width: any; height: any; }[]' to type 'FeaturedMedia' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: any; public_id: any; url: any; type: any; alt_text: any; width: any; height: any; }[]' is missing the following properties from type 'FeaturedMedia': id, public_id, url, type, and 3 more.
+src/routes/public.ts(591,23): error TS2352: Conversion of type '{ id: any; public_id: any; url: any; alt_text: any; }[]' to type 'FeaturedMedia' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: any; public_id: any; url: any; alt_text: any; }[]' is missing the following properties from type 'FeaturedMedia': id, public_id, url, type, and 3 more.
+src/routes/public.ts(674,27): error TS2352: Conversion of type '{ id: any; public_id: any; url: any; type: any; alt_text: any; width: any; height: any; }[]' to type 'FeaturedMedia' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: any; public_id: any; url: any; type: any; alt_text: any; width: any; height: any; }[]' is missing the following properties from type 'FeaturedMedia': id, public_id, url, type, and 3 more.
+src/routes/public.ts(860,27): error TS2352: Conversion of type '{ id: any; public_id: any; url: any; alt_text: any; }[]' to type 'FeaturedMedia' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: any; public_id: any; url: any; alt_text: any; }[]' is missing the following properties from type 'FeaturedMedia': id, public_id, url, type, and 3 more.
+src/routes/public.ts(994,88): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1006,85): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1018,88): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1030,88): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1042,84): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1108,90): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1143,87): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1178,90): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1215,86): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1304,88): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1316,90): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/utils/cloudinary.ts(5,19): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(new_config?: boolean | ConfigOptions | undefined): ConfigOptions', gave the following error.
+    Argument of type '{ cloud_name: string | undefined; api_key: string | undefined; api_secret: string | undefined; }' is not assignable to parameter of type 'boolean | ConfigOptions | undefined'.
+      Type '{ cloud_name: string | undefined; api_key: string | undefined; api_secret: string | undefined; }' is not assignable to type 'ConfigOptions' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+        Types of property 'cloud_name' are incompatible.
+          Type 'string | undefined' is not assignable to type 'string'.
+            Type 'undefined' is not assignable to type 'string'.
+  Overload 2 of 3, '(key: keyof ConfigOptions, value?: undefined): any', gave the following error.
+    Argument of type '{ cloud_name: string | undefined; api_key: string | undefined; api_secret: string | undefined; }' is not assignable to parameter of type 'keyof ConfigOptions'.
+src/utils/cloudinary.ts(36,9): error TS2379: Argument of type '{ folder: string; resource_type: "image" | "video" | "raw" | "auto"; public_id: string | undefined; transformation: any[] | undefined; tags: string[] | undefined; }' is not assignable to parameter of type 'UploadApiOptions' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'public_id' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/utils/cloudinary.ts(75,32): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(file: string, options?: UploadApiOptions | undefined, callback?: UploadResponseCallback | undefined): Promise<UploadApiResponse>', gave the following error.
+    Argument of type '{ folder: string; resource_type: "image" | "video" | "raw" | "auto"; public_id: string | undefined; transformation: any[] | undefined; tags: string[] | undefined; }' is not assignable to parameter of type 'UploadApiOptions' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+      Types of property 'public_id' are incompatible.
+        Type 'string | undefined' is not assignable to type 'string'.
+          Type 'undefined' is not assignable to type 'string'.
+  Overload 2 of 2, '(file: string, callback?: UploadResponseCallback | undefined): Promise<UploadApiResponse>', gave the following error.
+    Object literal may only specify known properties, and 'folder' does not exist in type 'UploadResponseCallback'.
+src/utils/validation.ts(1,19): error TS2307: Cannot find module 'zod' or its corresponding type declarations.
+src/utils/validation.ts(15,11): error TS7006: Parameter 'data' implicitly has an 'any' type.

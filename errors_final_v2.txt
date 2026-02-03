@@ -1,0 +1,5 @@
+src/routes/public.ts(1038,88): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1050,85): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1062,88): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/routes/public.ts(1074,88): error TS2339: Property 'public_id' does not exist on type '{ id: any; public_id: any; url: any; alt_text: any; }[]'.
+src/utils/validation.ts(1,19): error TS2307: Cannot find module 'zod' or its corresponding type declarations.
