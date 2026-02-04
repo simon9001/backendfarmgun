@@ -52,6 +52,7 @@ adminRoutes.delete('/bookings/:id/cancel', AdminController.cancelBookingAdmin);
 adminRoutes.get('/users', AdminController.getAllUsers);
 adminRoutes.get('/users/:id', AdminController.getUserDetails);
 adminRoutes.patch('/users/:id/role', AdminController.updateUserRole);
+adminRoutes.delete('/users/:id', AdminController.deleteUser);
 
 // Availability Management
 adminRoutes.post('/availability', AdminController.setAvailability);

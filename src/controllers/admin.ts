@@ -302,7 +302,7 @@ export class AdminController {
 
       if (bookings && bookings.length > 0) {
         return c.json({
-          error: 'Cannot delete service with active bookings',
+          error: `Cannot delete service. It has ${bookings.length} active booking(s). Please cancel or reassign them first.`,
           active_bookings: bookings.length
         }, 400);
       }
@@ -320,7 +320,7 @@ export class AdminController {
       });
     } catch (error) {
       console.error('Delete service error:', error);
-      return c.json({ error: 'Failed to delete service' }, 500);
+      return c.json({ error: 'Failed to delete service. It may be linked to other resources.' }, 500);
     }
   }
 
@@ -1261,6 +1261,79 @@ export class AdminController {
     } catch (error) {
       console.error('Update user role error:', error);
       return c.json({ error: 'Failed to update user role' }, 400);
+    }
+  }
+
+  static async deleteUser(c: Context) {
+    try {
+      const user = c.get('user');
+      if (user.role !== 'admin') {
+        return c.json({ error: 'Admin access required' }, 403);
+      }
+
+      const id = c.req.param('id');
+
+      // Prevent deleting self
+      if (id === user.userId) {
+        return c.json({ error: 'Cannot delete your own account' }, 400);
+      }
+
+      // Check if user has bookings
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('user_id', id);
+
+      if (bookings && bookings.length > 0) {
+        return c.json({
+          error: 'Cannot delete user with existing bookings',
+          active_bookings: bookings.length
+        }, 400);
+      }
+
+      // Check if user authored any tips
+      const { data: tips } = await supabase
+        .from('tips')
+        .select('id')
+        .eq('author_id', id);
+
+      if (tips && tips.length > 0) {
+        return c.json({
+          error: 'Cannot delete user who has authored tips. Please reassign or delete their content first.',
+          authored_tips: tips.length
+        }, 400);
+      }
+
+      // Check if user uploaded media (optional: or just let database CASCADE if configured, but better to be safe)
+      // For now, let's assume we want to prevent orphan media or complicated cascades
+      const { data: media } = await supabase
+        .from('media_library')
+        .select('id')
+        .eq('uploaded_by', id);
+
+      if (media && media.length > 0) {
+        // Option: Cascade delete? Or block? 
+        // Let's block for safety as requested in plan
+        return c.json({
+          error: 'Cannot delete user who has uploaded media files. Please clean up their media library first.',
+          uploaded_media: media.length
+        }, 400);
+      }
+
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      return c.json({
+        message: 'User deleted successfully',
+        deleted_id: id
+      });
+    } catch (error) {
+      console.error('Delete user error:', error);
+      return c.json({ error: 'Failed to delete user' }, 500);
     }
   }
 
