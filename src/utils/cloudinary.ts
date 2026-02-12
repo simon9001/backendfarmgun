@@ -180,11 +180,14 @@ export class CloudinaryService {
 
     if (options.quality) {
       transformations.quality = options.quality;
+    } else {
+      transformations.quality = 'auto';
     }
+
+    transformations.fetch_format = options.format || 'auto';
 
     const config: any = {
       secure: true,
-      format: options.format || 'auto',
     };
 
     if (Object.keys(transformations).length > 0) {

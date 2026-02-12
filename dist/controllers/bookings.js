@@ -1,5 +1,6 @@
 import { supabase } from '../db/supabaseClient.js';
 import { bookingSchema } from '../utils/validation.js';
+import { MpesaService } from '../utils/mpesa.js';
 export class BookingsController {
     static async getAvailableSlots(c) {
         try {
@@ -16,8 +17,11 @@ export class BookingsController {
             if (serviceError || !service) {
                 return c.json({ error: 'Service not found' }, 404);
             }
-            // Get admin availability (assuming admin_id = 1 for now)
-            const adminId = '1'; // In production, get from config or admin settings
+            // Get admin availability
+            const adminId = await BookingsController.getAdminId();
+            if (!adminId) {
+                return c.json({ error: 'System administrator not found' }, 500);
+            }
             // Get existing bookings for the date
             const { data: existingBookings, error: bookingsError } = await supabase
                 .from('bookings')
@@ -39,8 +43,8 @@ export class BookingsController {
                     const isAvailable = !existingBookings?.some(booking => {
                         const bookingStart = booking.start_time;
                         const bookingEnd = booking.end_time;
-                        const slotEnd = this.addMinutes(time, service.duration_mins);
-                        return this.timeOverlap(time, slotEnd, bookingStart, bookingEnd);
+                        const slotEnd = BookingsController.addMinutes(time, service.duration_mins);
+                        return BookingsController.timeOverlap(time, slotEnd, bookingStart, bookingEnd);
                     });
                     slots.push({
                         time,
@@ -63,16 +67,19 @@ export class BookingsController {
             // Get service details
             const { data: service, error: serviceError } = await supabase
                 .from('services')
-                .select('duration_mins, price')
+                .select('duration_mins, price, name')
                 .eq('id', validated.service_id)
                 .single();
             if (serviceError || !service) {
                 return c.json({ error: 'Service not found' }, 404);
             }
             // Calculate end time
-            const endTime = this.addMinutes(validated.start_time, service.duration_mins);
+            const endTime = BookingsController.addMinutes(validated.start_time, service.duration_mins);
             // Check for conflicts
-            const adminId = '1'; // In production, get from config
+            const adminId = await BookingsController.getAdminId();
+            if (!adminId) {
+                return c.json({ error: 'System administrator not found' }, 500);
+            }
             const { data: conflictingBooking, error: conflictError } = await supabase
                 .from('bookings')
                 .select('id')
@@ -86,7 +93,24 @@ export class BookingsController {
             if (conflictingBooking) {
                 return c.json({ error: 'Time slot is not available' }, 409);
             }
-            // Create booking
+            // 1. Initiate M-Pesa STK Push
+            let stkResponse;
+            try {
+                stkResponse = await MpesaService.initiateStkPush(validated.payment_phone, service.price, `BC-${Date.now()}`, `Consultation: ${service.name}`);
+            }
+            catch (mpesaError) {
+                const errorData = mpesaError.response?.data || mpesaError.message;
+                console.error('M-Pesa initiation failed:', errorData);
+                return c.json({
+                    error: 'Failed to initiate M-Pesa payment.',
+                    details: errorData,
+                    message: 'Please ensure your M-Pesa credentials in .env are correct and the phone number is valid.'
+                }, 400);
+            }
+            if (stkResponse.ResponseCode !== '0') {
+                return c.json({ error: 'M-Pesa rejected the request: ' + stkResponse.CustomerMessage }, 400);
+            }
+            // 2. Create booking (Pending Payment)
             const { data: booking, error: bookingError } = await supabase
                 .from('bookings')
                 .insert({
@@ -97,28 +121,37 @@ export class BookingsController {
                 start_time: validated.start_time,
                 end_time: endTime,
                 status: 'pending',
+                user_notes: validated.user_notes
             })
                 .select(`
           *,
           service:services(*),
-          user:users(name, email, phone)
+          user:users!bookings_user_id_fkey(name, email, phone)
         `)
                 .single();
-            if (bookingError)
-                throw bookingError;
-            // Create notification for admin
+            if (bookingError) {
+                console.error('Supabase booking error:', bookingError);
+                return c.json({ error: 'Failed to create booking record after payment initiation.' }, 500);
+            }
+            // 3. Create payment record with CheckoutRequestID
             await supabase
-                .from('notifications')
+                .from('payments')
                 .insert({
-                user_id: adminId,
-                type: 'booking_confirmation',
-                message: `New booking from ${user.userId} for ${validated.date} at ${validated.start_time}`,
+                booking_id: booking.id,
+                amount: service.price,
+                status: 'pending',
+                transaction_id: stkResponse.CheckoutRequestID // Use this to track the callback
             });
-            return c.json({ booking }, 201);
+            return c.json({
+                message: 'STK Push sent successfully. Please enter your PIN on your phone to complete booking.',
+                booking,
+                checkout_request_id: stkResponse.CheckoutRequestID
+            }, 201);
         }
         catch (error) {
             console.error('Create booking error:', error);
-            return c.json({ error: 'Failed to create booking' }, 400);
+            const message = error.message || 'Failed to create booking';
+            return c.json({ error: message }, 400);
         }
     }
     static async getUserBookings(c) {
@@ -165,7 +198,7 @@ export class BookingsController {
           *,
           service:services(*),
           payments(*),
-          user:users(*)
+          user:users!bookings_user_id_fkey(*)
         `)
                 .eq('id', id)
                 .maybeSingle();
@@ -289,6 +322,15 @@ export class BookingsController {
         const s2 = toMinutes(start2);
         const e2 = toMinutes(end2);
         return s1 < e2 && e1 > s2;
+    }
+    static async getAdminId() {
+        const { data: admin } = await supabase
+            .from('users')
+            .select('id')
+            .eq('role', 'admin')
+            .limit(1)
+            .maybeSingle();
+        return admin?.id;
     }
 }
 //# sourceMappingURL=bookings.js.map

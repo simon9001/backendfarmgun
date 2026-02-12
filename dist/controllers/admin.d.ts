@@ -273,6 +273,16 @@ export declare class AdminController {
         message: string;
         user: any;
     }, import("hono/utils/http-status").ContentfulStatusCode, "json">)>;
+    static deleteUser(c: Context): Promise<(Response & import("hono").TypedResponse<{
+        error: string;
+    }, 403, "json">) | (Response & import("hono").TypedResponse<{
+        error: string;
+    }, 400, "json">) | (Response & import("hono").TypedResponse<{
+        message: string;
+        deleted_id: string;
+    }, import("hono/utils/http-status").ContentfulStatusCode, "json">) | (Response & import("hono").TypedResponse<{
+        error: string;
+    }, 500, "json">)>;
     static setAvailability(c: Context): Promise<(Response & import("hono").TypedResponse<{
         error: string;
     }, 403, "json">) | (Response & import("hono").TypedResponse<{
@@ -360,5 +370,7 @@ export declare class AdminController {
     }, import("hono/utils/http-status").ContentfulStatusCode, "json">) | (Response & import("hono").TypedResponse<{
         error: string;
     }, 500, "json">)>;
+    private static deleteMediaInternal;
+    private static uploadFileInternal;
 }
 //# sourceMappingURL=admin.d.ts.map

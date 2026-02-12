@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
-import { serve } from '@hono/node-server'; // ADD THIS
+import { serve } from '@hono/node-server';
 import { authRoutes } from './routes/auth.js';
 import { serviceRoutes } from './routes/services.js';
 import { bookingRoutes } from './routes/bookings.js';
@@ -11,16 +11,16 @@ import { adminRoutes } from './routes/admin.js';
 import { publicRoutes } from './routes/public.js';
 import { mediaRoutes } from './routes/media.js';
 import { extractUser } from './middleware/authMiddleware.js';
-import { env } from './db/envConfig.js'; // IMPORT ENV CONFIG
+import { env } from './db/envConfig.js';
 const app = new Hono();
-// Middleware
+// === MIDDLEWARE ===
 app.use('*', logger());
 app.use('*', cors({
-    origin: env.CORS_ORIGIN?.split(',') || ['http://localhost:5174'],
+    origin: env.CORS_ORIGIN?.split(',') || ['https://www.farmwithirene.online'],
     credentials: true,
 }));
 app.use('*', extractUser);
-// Health check
+// === HEALTH CHECK ===
 app.get('/', (c) => {
     return c.json({
         message: 'Agriculture Consultation Platform API',
@@ -29,20 +29,20 @@ app.get('/', (c) => {
         env: env.NODE_ENV
     });
 });
-// Public routes
+// === PUBLIC ROUTES ===
 app.route('/api/public', publicRoutes);
-// Auth routes
+// === AUTH ROUTES ===
 app.route('/api/auth', authRoutes);
-// Media routes
+// === MEDIA ROUTES ===
 app.route('/api/media', mediaRoutes);
-// Protected routes
+// === PROTECTED ROUTES ===
 app.route('/api/services', serviceRoutes);
 app.route('/api/bookings', bookingRoutes);
 app.route('/api/payments', paymentRoutes);
 app.route('/api/notifications', notificationRoutes);
-// Admin routes
+// === ADMIN ROUTES ===
 app.route('/api/admin', adminRoutes);
-// Error handling
+// === ERROR HANDLING ===
 app.onError((err, c) => {
     console.error('Unhandled error:', err);
     return c.json({
@@ -53,8 +53,8 @@ app.onError((err, c) => {
 app.notFound((c) => {
     return c.json({ error: 'Endpoint not found' }, 404);
 });
-const port = parseInt(env.PORT || '3001');
-// ACTUALLY START THE SERVER
+// === START SERVER ===
+const port = parseInt(env.PORT || '3001', 10);
 serve({
     fetch: app.fetch,
     port
@@ -63,13 +63,11 @@ serve({
     console.log(`📁 Environment: ${env.NODE_ENV}`);
     console.log(`🌐 CORS Origin: ${env.CORS_ORIGIN}`);
 });
-// Optional: Handle graceful shutdown
-process.on('SIGINT', () => {
-    console.log('Shutting down server...');
-    process.exit(0);
-});
-process.on('SIGTERM', () => {
-    console.log('Shutting down server...');
-    process.exit(0);
+// === GRACEFUL SHUTDOWN ===
+['SIGINT', 'SIGTERM'].forEach((signal) => {
+    process.on(signal, () => {
+        console.log(`Received ${signal}, shutting down gracefully...`);
+        process.exit(0);
+    });
 });
 //# sourceMappingURL=index.js.map

@@ -18,7 +18,7 @@ const app = new Hono();
 // === MIDDLEWARE ===
 app.use('*', logger());
 app.use('*', cors({
-  origin: env.CORS_ORIGIN?.split(',') || ['https://farmwithirene.netlify.app'],
+  origin: env.CORS_ORIGIN?.split(',') || ['https://www.farmwithirene.online'],
   credentials: true,
 }));
 app.use('*', extractUser);

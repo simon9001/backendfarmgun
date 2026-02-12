@@ -17,6 +17,7 @@ export declare class MediaController {
         };
     }, 201, "json">) | (Response & import("hono").TypedResponse<{
         error: string;
+        details: string;
     }, 500, "json">)>;
     static uploadMultipleMedia(c: Context): Promise<(Response & import("hono").TypedResponse<{
         error: string;

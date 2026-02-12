@@ -23,10 +23,10 @@ export declare class PaymentsController {
     static handlePaymentCallback(c: Context): Promise<(Response & import("hono").TypedResponse<{
         error: string;
     }, 400, "json">) | (Response & import("hono").TypedResponse<{
-        error: string;
-    }, 404, "json">) | (Response & import("hono").TypedResponse<{
         message: string;
     }, import("hono/utils/http-status").ContentfulStatusCode, "json">) | (Response & import("hono").TypedResponse<{
+        error: string;
+    }, 404, "json">) | (Response & import("hono").TypedResponse<{
         error: string;
     }, 500, "json">)>;
     static getPaymentHistory(c: Context): Promise<(Response & import("hono").TypedResponse<never, import("hono/utils/http-status").ContentfulStatusCode, "json">) | (Response & import("hono").TypedResponse<{

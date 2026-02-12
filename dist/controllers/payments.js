@@ -68,37 +68,54 @@ export class PaymentsController {
     static async handlePaymentCallback(c) {
         try {
             const callbackData = await c.req.json();
-            // Verify callback from Daraja
-            // In production, verify signature
-            const { ResultCode, ResultDesc, CheckoutRequestID, Amount, MpesaReceiptNumber, } = callbackData;
-            if (ResultCode !== '0') {
-                console.error('Payment failed:', ResultDesc);
-                return c.json({ error: 'Payment failed' }, 400);
+            console.log('M-Pesa Callback received:', JSON.stringify(callbackData, null, 2));
+            const stkCallback = callbackData.Body?.stkCallback;
+            if (!stkCallback) {
+                return c.json({ error: 'Invalid callback data' }, 400);
             }
-            // Find payment by reference
+            const { ResultCode, ResultDesc, CheckoutRequestID, CallbackMetadata } = stkCallback;
+            if (ResultCode !== 0) {
+                console.warn('M-Pesa Payment failed:', ResultDesc);
+                // Update payment status to failed
+                await supabase
+                    .from('payments')
+                    .update({ status: 'failed', notes: ResultDesc })
+                    .eq('transaction_id', CheckoutRequestID);
+                return c.json({ message: 'Callback processed with failure status' });
+            }
+            // Extract metadata items
+            const items = CallbackMetadata?.Item || [];
+            const amount = items.find((i) => i.Name === 'Amount')?.Value;
+            const mpesaReceipt = items.find((i) => i.Name === 'MpesaReceiptNumber')?.Value;
+            // 1. Update payment record
             const { data: payment, error: paymentError } = await supabase
                 .from('payments')
                 .update({
                 status: 'success',
-                transaction_id: MpesaReceiptNumber,
+                transaction_id: mpesaReceipt, // Replace CheckoutRequestID with actual receipt
                 paid_at: new Date().toISOString(),
             })
-                .eq('transaction_id', CheckoutRequestID)
+                .eq('transaction_id', CheckoutRequestID) // Match by the original CheckoutRequestID
                 .select()
                 .single();
-            if (paymentError)
+            if (paymentError) {
+                console.error('Callback: Payment update error:', paymentError);
                 throw paymentError;
-            if (!payment) {
-                return c.json({ error: 'Payment not found' }, 404);
             }
-            // Update booking status
+            if (!payment) {
+                console.error('Callback: Payment record not found for CheckoutRequestID:', CheckoutRequestID);
+                return c.json({ error: 'Payment record not found' }, 404);
+            }
+            // 2. Update booking status
             const { error: bookingError } = await supabase
                 .from('bookings')
                 .update({ status: 'paid' })
                 .eq('id', payment.booking_id);
-            if (bookingError)
+            if (bookingError) {
+                console.error('Callback: Booking update error:', bookingError);
                 throw bookingError;
-            // Create notification
+            }
+            // 3. Create notification for user
             const { data: booking } = await supabase
                 .from('bookings')
                 .select('user_id')
@@ -110,7 +127,7 @@ export class PaymentsController {
                     .insert({
                     user_id: booking.user_id,
                     type: 'payment_receipt',
-                    message: `Payment of KES ${Amount} received for booking ${payment.booking_id}. Receipt: ${MpesaReceiptNumber}`,
+                    message: `Payment of KES ${amount} received for booking ${payment.booking_id}. Receipt: ${mpesaReceipt}`,
                 });
             }
             return c.json({ message: 'Payment processed successfully' });

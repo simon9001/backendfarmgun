@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { AdminController } from '../controllers/admin.js';
-import { authMiddleware } from '../middleware/authMiddleware.js';
-import { adminOnly } from '../middleware/authMiddleware.js';
+import { authMiddleware, adminOnly } from '../middleware/authMiddleware.js';
+import { uploadSingle } from '../middleware/uploadMiddleware.js';
 export const adminRoutes = new Hono();
 // Apply auth middleware to all admin routes
 adminRoutes.use('*', authMiddleware);
@@ -19,8 +19,8 @@ adminRoutes.post('/crops', AdminController.createCrop);
 adminRoutes.patch('/crops/:id', AdminController.updateCrop);
 adminRoutes.delete('/crops/:id', AdminController.deleteCrop);
 // Projects Management
-adminRoutes.post('/projects', AdminController.createProject);
-adminRoutes.patch('/projects/:id', AdminController.updateProject);
+adminRoutes.post('/projects', uploadSingle('file'), AdminController.createProject);
+adminRoutes.patch('/projects/:id', uploadSingle('file'), AdminController.updateProject);
 adminRoutes.delete('/projects/:id', AdminController.deleteProject);
 adminRoutes.post('/projects/:id/media', AdminController.addProjectMedia);
 adminRoutes.delete('/projects/media/:mediaId', AdminController.removeProjectMedia);
@@ -42,6 +42,7 @@ adminRoutes.delete('/bookings/:id/cancel', AdminController.cancelBookingAdmin);
 adminRoutes.get('/users', AdminController.getAllUsers);
 adminRoutes.get('/users/:id', AdminController.getUserDetails);
 adminRoutes.patch('/users/:id/role', AdminController.updateUserRole);
+adminRoutes.delete('/users/:id', AdminController.deleteUser);
 // Availability Management
 adminRoutes.post('/availability', AdminController.setAvailability);
 adminRoutes.get('/availability', AdminController.getAvailability);

@@ -17,6 +17,39 @@ interface FeaturedMedia {
   mime_type?: string;
 }
 
+// Media Optimization Helper
+const optimizeMedia = (media: FeaturedMedia | null, options: { width?: number; height?: number; quality?: number; crop?: string }) => {
+  if (!media || !media.public_id) return media;
+
+  const isCloudinary = media.url?.includes('res.cloudinary.com');
+  const isPlaceholder = ['hero-image', 'service-image', 'tip-image', 'crop-image', 'project-image'].includes(media.public_id);
+
+  if (isCloudinary && !isPlaceholder) {
+    // Extract version if present in URL
+    const versionMatch = media.url?.match(/\/v(\d+)\//);
+    const version = versionMatch ? versionMatch[1] : undefined;
+
+    return {
+      ...media,
+      optimized_url: CloudinaryService.getOptimizedImageUrl(media.public_id, {
+        ...options,
+        // @ts-ignore - version is supported by cloudinary.url but might not be in our basic wrapper
+        version,
+      }),
+      thumbnail_url: CloudinaryService.getOptimizedImageUrl(media.public_id, {
+        width: 200,
+        height: 150,
+        crop: 'fill',
+        quality: 60,
+        // @ts-ignore
+        version,
+      }),
+    };
+  }
+
+  return media;
+};
+
 // Services - Public
 publicRoutes.get('/services', async (c) => {
   const { featured, limit = '50', offset = '0' } = c.req.query();
@@ -74,29 +107,14 @@ publicRoutes.get('/services', async (c) => {
     const featuredMediaData = service.featured_media as any;
     const featuredMedia = (Array.isArray(featuredMediaData) ? featuredMediaData[0] : featuredMediaData) as FeaturedMedia | null;
 
-    if (featuredMedia?.public_id) {
-      return {
-        ...service,
-        featured_media: {
-          ...featuredMedia,
-          optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-            width: 600,
-            height: 400,
-            crop: 'fill',
-            quality: 80,
-          }),
-          thumbnail_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-            width: 300,
-            height: 200,
-            crop: 'fill',
-            quality: 70,
-          }),
-        }
-      };
-    }
     return {
       ...service,
-      featured_media: featuredMedia
+      featured_media: optimizeMedia(featuredMedia, {
+        width: 600,
+        height: 400,
+        crop: 'fill',
+        quality: 80,
+      })
     };
   });
 
@@ -132,7 +150,8 @@ publicRoutes.get('/services/:id', async (c) => {
           id,
           public_id,
           url,
-          alt_text
+          alt_text,
+          type
         )
       )
     `)
@@ -147,19 +166,12 @@ publicRoutes.get('/services/:id', async (c) => {
   const featuredMediaData = service.featured_media as any;
   const featuredMedia = (Array.isArray(featuredMediaData) ? featuredMediaData[0] : featuredMediaData) as FeaturedMedia | null;
 
-  if (featuredMedia?.public_id) {
-    service.featured_media = {
-      ...featuredMedia,
-      optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-        width: 800,
-        height: 600,
-        crop: 'fill',
-        quality: 85,
-      }),
-    } as any;
-  } else {
-    service.featured_media = featuredMedia as any;
-  }
+  service.featured_media = optimizeMedia(featuredMedia, {
+    width: 800,
+    height: 600,
+    crop: 'fill',
+    quality: 85,
+  }) as any;
 
   // Optimize crop images
   if (service.service_crops) {
@@ -167,23 +179,14 @@ publicRoutes.get('/services/:id', async (c) => {
       const cropFeaturedMediaData = crop.featured_media as any;
       const cropFeaturedMedia = (Array.isArray(cropFeaturedMediaData) ? cropFeaturedMediaData[0] : cropFeaturedMediaData) as FeaturedMedia | null;
 
-      if (cropFeaturedMedia?.public_id) {
-        return {
-          ...crop,
-          featured_media: {
-            ...cropFeaturedMedia,
-            optimized_url: CloudinaryService.getOptimizedImageUrl(cropFeaturedMedia.public_id, {
-              width: 400,
-              height: 300,
-              crop: 'fill',
-              quality: 80,
-            }),
-          }
-        };
-      }
       return {
         ...crop,
-        featured_media: cropFeaturedMedia
+        featured_media: optimizeMedia(cropFeaturedMedia, {
+          width: 400,
+          height: 300,
+          crop: 'fill',
+          quality: 80,
+        })
       };
     });
   }
@@ -218,6 +221,11 @@ publicRoutes.get('/crops', async (c) => {
         width,
         height
       ),
+      crop_media:crop_media(
+        id,
+        display_order,
+        media:media_library(*)
+      ),
       service_crops:services(
         id,
         name,
@@ -245,30 +253,33 @@ publicRoutes.get('/crops', async (c) => {
     const featuredMediaData = crop.featured_media as any;
     const featuredMedia = (Array.isArray(featuredMediaData) ? featuredMediaData[0] : featuredMediaData) as FeaturedMedia | null;
 
-    if (featuredMedia?.public_id) {
-      return {
-        ...crop,
-        featured_media: {
-          ...featuredMedia,
-          optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-            width: 500,
-            height: 350,
+    const optimizedCrop: any = {
+      ...crop,
+      featured_media: optimizeMedia(featuredMedia, {
+        width: 500,
+        height: 350,
+        crop: 'fill',
+        quality: 80,
+      })
+    };
+
+    // Optimize gallery images
+    if (optimizedCrop.crop_media) {
+      optimizedCrop.crop_media = optimizedCrop.crop_media.map((item: any) => {
+        const itemMedia = (Array.isArray(item.media) ? item.media[0] : item.media) as FeaturedMedia | null;
+        return {
+          ...item,
+          media: optimizeMedia(itemMedia, {
+            width: 400,
+            height: 300,
             crop: 'fill',
             quality: 80,
-          }),
-          thumbnail_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-            width: 200,
-            height: 150,
-            crop: 'fill',
-            quality: 70,
-          }),
-        }
-      };
+          })
+        };
+      });
     }
-    return {
-      ...crop,
-      featured_media: featuredMedia
-    };
+
+    return optimizedCrop;
   });
 
   return c.json({ crops: cropsWithOptimizedUrls || [] });
@@ -292,12 +303,16 @@ publicRoutes.get('/crops/:id', async (c) => {
         height,
         mime_type
       ),
+      crop_media:crop_media(
+        id,
+        display_order,
+        media:media_library(*)
+      ),
       service_crops:services(
         id,
         name,
-        description,
-        duration_mins,
         price,
+        duration_mins,
         featured_media:media_library(
           id,
           public_id,
@@ -317,18 +332,27 @@ publicRoutes.get('/crops/:id', async (c) => {
   const featuredMediaData = crop.featured_media as any;
   const featuredMedia = (Array.isArray(featuredMediaData) ? featuredMediaData[0] : featuredMediaData) as FeaturedMedia | null;
 
-  if (featuredMedia?.public_id) {
-    crop.featured_media = {
-      ...featuredMedia,
-      optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-        width: 800,
-        height: 500,
-        crop: 'fill',
-        quality: 85,
-      }),
-    } as any;
-  } else {
-    crop.featured_media = featuredMedia as any;
+  crop.featured_media = optimizeMedia(featuredMedia, {
+    width: 800,
+    height: 500,
+    crop: 'fill',
+    quality: 85,
+  }) as any;
+
+  // Optimize gallery images
+  if (crop.crop_media) {
+    crop.crop_media = crop.crop_media.map((item: any) => {
+      const itemMedia = (Array.isArray(item.media) ? item.media[0] : item.media) as FeaturedMedia | null;
+      return {
+        ...item,
+        media: optimizeMedia(itemMedia, {
+          width: 800,
+          height: 600,
+          crop: 'fill',
+          quality: 80,
+        })
+      };
+    });
   }
 
   // Optimize service images
@@ -337,23 +361,14 @@ publicRoutes.get('/crops/:id', async (c) => {
       const serviceFeaturedMediaData = service.featured_media as any;
       const serviceFeaturedMedia = (Array.isArray(serviceFeaturedMediaData) ? serviceFeaturedMediaData[0] : serviceFeaturedMediaData) as FeaturedMedia | null;
 
-      if (serviceFeaturedMedia?.public_id) {
-        return {
-          ...service,
-          featured_media: {
-            ...serviceFeaturedMedia,
-            optimized_url: CloudinaryService.getOptimizedImageUrl(serviceFeaturedMedia.public_id, {
-              width: 400,
-              height: 300,
-              crop: 'fill',
-              quality: 80,
-            }),
-          }
-        };
-      }
       return {
         ...service,
-        featured_media: serviceFeaturedMedia
+        featured_media: optimizeMedia(serviceFeaturedMedia, {
+          width: 400,
+          height: 300,
+          crop: 'fill',
+          quality: 80,
+        })
       };
     });
   }
@@ -390,6 +405,11 @@ publicRoutes.get('/projects', async (c) => {
         width,
         height
       ),
+      project_media:project_media(
+        id,
+        display_order,
+        media:media_library(*)
+      ),
       created_at
     `)
     .order('created_at', { ascending: false })
@@ -411,30 +431,33 @@ publicRoutes.get('/projects', async (c) => {
     const featuredMediaData = project.featured_media as any;
     const featuredMedia = (Array.isArray(featuredMediaData) ? featuredMediaData[0] : featuredMediaData) as FeaturedMedia | null;
 
-    if (featuredMedia?.public_id) {
-      return {
-        ...project,
-        featured_media: {
-          ...featuredMedia,
-          optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
+    const optimizedProject: any = {
+      ...project,
+      featured_media: optimizeMedia(featuredMedia, {
+        width: 800,
+        height: 450,
+        crop: 'fill',
+        quality: 85,
+      })
+    };
+
+    // Optimize gallery images
+    if (optimizedProject.project_media) {
+      optimizedProject.project_media = optimizedProject.project_media.map((item: any) => {
+        const itemMedia = (Array.isArray(item.media) ? item.media[0] : item.media) as FeaturedMedia | null;
+        return {
+          ...item,
+          media: optimizeMedia(itemMedia, {
             width: 800,
             height: 450,
             crop: 'fill',
-            quality: 85,
-          }),
-          thumbnail_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-            width: 400,
-            height: 225,
-            crop: 'fill',
-            quality: 75,
-          }),
-        }
-      };
+            quality: 80,
+          })
+        };
+      });
     }
-    return {
-      ...project,
-      featured_media: featuredMedia
-    };
+
+    return optimizedProject;
   });
 
   return c.json({ projects: projectsWithOptimizedUrls || [] });
@@ -499,67 +522,44 @@ publicRoutes.get('/projects/:id', async (c) => {
   const featuredMediaData = project.featured_media as any;
   const featuredMedia = (Array.isArray(featuredMediaData) ? featuredMediaData[0] : featuredMediaData) as FeaturedMedia | null;
 
-  if (featuredMedia?.public_id) {
-    project.featured_media = {
-      ...featuredMedia,
-      optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-        width: 1200,
-        height: 675,
-        crop: 'fill',
-        quality: 90,
-      }),
-    } as any;
-  } else {
-    project.featured_media = featuredMedia as any;
-  }
+  project.featured_media = optimizeMedia(featuredMedia, {
+    width: 1200,
+    height: 675,
+    crop: 'fill',
+    quality: 90,
+  }) as any;
 
   // Optimize project media gallery images
   if (project.project_media) {
     project.project_media = project.project_media.map((item: any) => {
-      const itemMedia = item.media as FeaturedMedia | null;
-      if (itemMedia?.public_id) {
-        return {
-          ...item,
-          media: {
-            ...itemMedia,
-            optimized_url: CloudinaryService.getOptimizedImageUrl(itemMedia.public_id, {
-              width: 1000,
-              height: 750,
-              crop: 'fill',
-              quality: 85,
-            }),
-            thumbnail_url: CloudinaryService.getOptimizedImageUrl(itemMedia.public_id, {
-              width: 200,
-              height: 150,
-              crop: 'fill',
-              quality: 70,
-            }),
-          }
-        };
-      }
-      return item;
+      const itemMedia = (Array.isArray(item.media) ? item.media[0] : item.media) as FeaturedMedia | null;
+      return {
+        ...item,
+        media: optimizeMedia(itemMedia, {
+          width: 1000,
+          height: 750,
+          crop: 'fill',
+          quality: 85,
+        })
+      };
     });
   }
 
   // Optimize testimonial user images
   if (project.testimonials) {
     project.testimonials = project.testimonials.map((testimonial: any) => {
-      const userMedia = testimonial.user_media as FeaturedMedia | null;
-      if (userMedia?.public_id) {
-        return {
-          ...testimonial,
-          user_media: {
-            ...userMedia,
-            optimized_url: CloudinaryService.getOptimizedImageUrl(userMedia.public_id, {
-              width: 100,
-              height: 100,
-              crop: 'fill',
-              quality: 80,
-            }),
-          }
-        };
-      }
-      return testimonial;
+      const userMediaData = testimonial.user_media as any;
+      const userMedia = (Array.isArray(userMediaData) ? userMediaData[0] : userMediaData) as FeaturedMedia | null;
+
+      return {
+        ...testimonial,
+        user_media: optimizeMedia(userMedia, {
+          width: 100,
+          height: 100,
+          crop: 'fill',
+          quality: 80,
+        })
+      };
     });
   }
 
@@ -620,23 +620,14 @@ publicRoutes.get('/testimonials', async (c) => {
     const userMediaData = testimonial.user_media as any;
     const userMedia = (Array.isArray(userMediaData) ? userMediaData[0] : userMediaData) as FeaturedMedia | null;
 
-    if (userMedia?.public_id) {
-      return {
-        ...testimonial,
-        user_media: {
-          ...userMedia,
-          optimized_url: CloudinaryService.getOptimizedImageUrl(userMedia.public_id, {
-            width: 80,
-            height: 80,
-            crop: 'fill',
-            quality: 80,
-          }),
-        }
-      };
-    }
     return {
       ...testimonial,
-      user_media: userMedia
+      user_media: optimizeMedia(userMedia, {
+        width: 80,
+        height: 80,
+        crop: 'fill',
+        quality: 80,
+      })
     };
   });
 
@@ -708,29 +699,14 @@ publicRoutes.get('/tips', async (c) => {
     const featuredMediaData = tip.featured_media as any;
     const featuredMedia = (Array.isArray(featuredMediaData) ? featuredMediaData[0] : featuredMediaData) as FeaturedMedia | null;
 
-    if (featuredMedia?.public_id) {
-      return {
-        ...tip,
-        featured_media: {
-          ...featuredMedia,
-          optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-            width: 800,
-            height: 450,
-            crop: 'fill',
-            quality: 85,
-          }),
-          thumbnail_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-            width: 400,
-            height: 225,
-            crop: 'fill',
-            quality: 75,
-          }),
-        }
-      };
-    }
     return {
       ...tip,
-      featured_media: featuredMedia
+      featured_media: optimizeMedia(featuredMedia, {
+        width: 800,
+        height: 450,
+        crop: 'fill',
+        quality: 85,
+      })
     };
   });
 
@@ -794,53 +770,39 @@ publicRoutes.get('/tips/:slug', async (c) => {
   }
 
   // Add optimized URL for featured media
-  const featuredMedia = tip.featured_media as FeaturedMedia | null;
-  if (featuredMedia?.public_id) {
-    tip.featured_media = {
-      ...featuredMedia,
-      optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-        width: 1200,
-        height: 630,
-        crop: 'fill',
-        quality: 90,
-      }),
-    };
-  }
+  const featuredMedia = (Array.isArray(tip.featured_media) ? tip.featured_media[0] : tip.featured_media) as FeaturedMedia | null;
+  tip.featured_media = optimizeMedia(featuredMedia, {
+    width: 1200,
+    height: 630,
+    crop: 'fill',
+    quality: 90,
+  }) as any;
 
   // Optimize tip media gallery images
   if (tip.tip_media) {
     tip.tip_media = tip.tip_media.map((item: any) => {
-      const itemMedia = item.media as FeaturedMedia | null;
-      if (itemMedia?.public_id) {
-        return {
-          ...item,
-          media: {
-            ...itemMedia,
-            optimized_url: CloudinaryService.getOptimizedImageUrl(itemMedia.public_id, {
-              width: 1000,
-              height: 750,
-              crop: 'fill',
-              quality: 85,
-            }),
-          }
-        };
-      }
-      return item;
+      const itemMedia = (Array.isArray(item.media) ? item.media[0] : item.media) as FeaturedMedia | null;
+      return {
+        ...item,
+        media: optimizeMedia(itemMedia, {
+          width: 1000,
+          height: 750,
+          crop: 'fill',
+          quality: 85,
+        })
+      };
     });
   }
 
   // Optimize author profile image
-  if (tip.author?.profile_media?.public_id) {
-    const profileMedia = tip.author.profile_media as FeaturedMedia;
-    tip.author.profile_media = {
-      ...profileMedia,
-      optimized_url: CloudinaryService.getOptimizedImageUrl(profileMedia.public_id, {
-        width: 100,
-        height: 100,
-        crop: 'fill',
-        quality: 80,
-      }),
-    };
+  if (tip.author?.profile_media) {
+    const profileMedia = (Array.isArray(tip.author.profile_media) ? tip.author.profile_media[0] : tip.author.profile_media) as FeaturedMedia | null;
+    tip.author.profile_media = optimizeMedia(profileMedia, {
+      width: 100,
+      height: 100,
+      crop: 'fill',
+      quality: 80,
+    }) as any;
   }
 
   return c.json({ tip });
@@ -899,23 +861,14 @@ publicRoutes.get('/tips/:slug/related', async (c) => {
     const featuredMediaData = tip.featured_media as any;
     const featuredMedia = (Array.isArray(featuredMediaData) ? featuredMediaData[0] : featuredMediaData) as FeaturedMedia | null;
 
-    if (featuredMedia?.public_id) {
-      return {
-        ...tip,
-        featured_media: {
-          ...featuredMedia,
-          optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-            width: 400,
-            height: 225,
-            crop: 'fill',
-            quality: 80,
-          }),
-        }
-      };
-    }
     return {
       ...tip,
-      featured_media: featuredMedia
+      featured_media: optimizeMedia(featuredMedia, {
+        width: 400,
+        height: 225,
+        crop: 'fill',
+        quality: 80,
+      })
     };
   });
 
@@ -1036,15 +989,12 @@ publicRoutes.get('/landing-data', async (c) => {
         const featuredMedia = (Array.isArray(featuredMediaData) ? featuredMediaData[0] : featuredMediaData) as FeaturedMedia | null;
         return {
           ...service,
-          featured_media: featuredMedia ? {
-            ...featuredMedia,
-            optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-              width: 400,
-              height: 300,
-              crop: 'fill',
-              quality: 80,
-            }),
-          } : null,
+          featured_media: optimizeMedia(featuredMedia, {
+            width: 400,
+            height: 300,
+            crop: 'fill',
+            quality: 80,
+          }),
         };
       }) || [],
       crops: cropsResponse.data?.map(crop => {
@@ -1052,15 +1002,12 @@ publicRoutes.get('/landing-data', async (c) => {
         const featuredMedia = (Array.isArray(featuredMediaData) ? featuredMediaData[0] : featuredMediaData) as FeaturedMedia | null;
         return {
           ...crop,
-          featured_media: featuredMedia ? {
-            ...featuredMedia,
-            optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-              width: 400,
-              height: 300,
-              crop: 'fill',
-              quality: 80,
-            }),
-          } : null,
+          featured_media: optimizeMedia(featuredMedia, {
+            width: 400,
+            height: 300,
+            crop: 'fill',
+            quality: 80,
+          }),
         };
       }) || [],
       projects: projectsResponse.data?.map(project => {
@@ -1068,15 +1015,12 @@ publicRoutes.get('/landing-data', async (c) => {
         const featuredMedia = (Array.isArray(featuredMediaData) ? featuredMediaData[0] : featuredMediaData) as FeaturedMedia | null;
         return {
           ...project,
-          featured_media: featuredMedia ? {
-            ...featuredMedia,
-            optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-              width: 600,
-              height: 400,
-              crop: 'fill',
-              quality: 85,
-            }),
-          } : null,
+          featured_media: optimizeMedia(featuredMedia, {
+            width: 600,
+            height: 400,
+            crop: 'fill',
+            quality: 85,
+          }),
         };
       }) || [],
       testimonials: testimonialsResponse.data?.map(testimonial => {
@@ -1084,15 +1028,12 @@ publicRoutes.get('/landing-data', async (c) => {
         const userMedia = (Array.isArray(userMediaData) ? userMediaData[0] : userMediaData) as FeaturedMedia | null;
         return {
           ...testimonial,
-          user_media: userMedia ? {
-            ...userMedia,
-            optimized_url: CloudinaryService.getOptimizedImageUrl(userMedia.public_id, {
-              width: 80,
-              height: 80,
-              crop: 'fill',
-              quality: 80,
-            }),
-          } : null,
+          user_media: optimizeMedia(userMedia, {
+            width: 80,
+            height: 80,
+            crop: 'fill',
+            quality: 80,
+          }),
         };
       }) || [],
       tips: tipsResponse.data?.map(tip => {
@@ -1100,15 +1041,12 @@ publicRoutes.get('/landing-data', async (c) => {
         const featuredMedia = (Array.isArray(featuredMediaData) ? featuredMediaData[0] : featuredMediaData) as FeaturedMedia | null;
         return {
           ...tip,
-          featured_media: featuredMedia ? {
-            ...featuredMedia,
-            optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-              width: 400,
-              height: 225,
-              crop: 'fill',
-              quality: 80,
-            }),
-          } : null,
+          featured_media: optimizeMedia(featuredMedia, {
+            width: 400,
+            height: 225,
+            crop: 'fill',
+            quality: 80,
+          }),
         };
       }) || [],
     };
@@ -1170,15 +1108,12 @@ publicRoutes.get('/search', async (c) => {
           return {
             ...service,
             type: 'service',
-            featured_media: featuredMedia ? {
-              ...featuredMedia,
-              optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-                width: 200,
-                height: 150,
-                crop: 'fill',
-                quality: 70,
-              }),
-            } : null,
+            featured_media: optimizeMedia(featuredMedia, {
+              width: 200,
+              height: 150,
+              crop: 'fill',
+              quality: 70,
+            }),
           };
         }) || [];
       }
@@ -1209,15 +1144,12 @@ publicRoutes.get('/search', async (c) => {
           return {
             ...crop,
             type: 'crop',
-            featured_media: featuredMedia ? {
-              ...featuredMedia,
-              optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-                width: 200,
-                height: 150,
-                crop: 'fill',
-                quality: 70,
-              }),
-            } : null,
+            featured_media: optimizeMedia(featuredMedia, {
+              width: 200,
+              height: 150,
+              crop: 'fill',
+              quality: 70,
+            }),
           };
         }) || [];
       }
@@ -1248,15 +1180,12 @@ publicRoutes.get('/search', async (c) => {
           return {
             ...project,
             type: 'project',
-            featured_media: featuredMedia ? {
-              ...featuredMedia,
-              optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-                width: 200,
-                height: 150,
-                crop: 'fill',
-                quality: 70,
-              }),
-            } : null,
+            featured_media: optimizeMedia(featuredMedia, {
+              width: 200,
+              height: 150,
+              crop: 'fill',
+              quality: 70,
+            }),
           };
         }) || [];
       }
@@ -1289,15 +1218,12 @@ publicRoutes.get('/search', async (c) => {
           return {
             ...tip,
             type: 'tip',
-            featured_media: featuredMedia ? {
-              ...featuredMedia,
-              optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-                width: 200,
-                height: 150,
-                crop: 'fill',
-                quality: 70,
-              }),
-            } : null,
+            featured_media: optimizeMedia(featuredMedia, {
+              width: 200,
+              height: 150,
+              crop: 'fill',
+              quality: 70,
+            }),
           };
         }) || [];
       }
@@ -1382,15 +1308,12 @@ publicRoutes.get('/homepage/hero', async (c) => {
         const featuredMedia = (Array.isArray(featuredMediaData) ? featuredMediaData[0] : featuredMediaData) as FeaturedMedia | null;
         return {
           ...service,
-          featured_media: featuredMedia ? {
-            ...featuredMedia,
-            optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-              width: 600,
-              height: 400,
-              crop: 'fill',
-              quality: 85,
-            }),
-          } : null,
+          featured_media: optimizeMedia(featuredMedia, {
+            width: 600,
+            height: 400,
+            crop: 'fill',
+            quality: 85,
+          }),
         };
       }) || [],
       latest_tip: latestTip ? (() => {
@@ -1398,15 +1321,12 @@ publicRoutes.get('/homepage/hero', async (c) => {
         const featuredMedia = (Array.isArray(featuredMediaData) ? featuredMediaData[0] : featuredMediaData) as FeaturedMedia | null;
         return {
           ...latestTip,
-          featured_media: featuredMedia ? {
-            ...featuredMedia,
-            optimized_url: CloudinaryService.getOptimizedImageUrl(featuredMedia.public_id, {
-              width: 800,
-              height: 450,
-              crop: 'fill',
-              quality: 90,
-            }),
-          } : null,
+          featured_media: optimizeMedia(featuredMedia, {
+            width: 800,
+            height: 450,
+            crop: 'fill',
+            quality: 90,
+          }),
         };
       })() : null,
     };

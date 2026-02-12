@@ -1,5 +1,7 @@
 import { supabase } from '../db/supabaseClient.js';
 import { projectSchema, testimonialSchema, tipSchema, serviceSchema, cropSchema, availabilitySchema } from '../utils/validation.js';
+import { CloudinaryService } from '../utils/cloudinary.js';
+import { getUploadedFile, getFolderForCategory, getResourceType } from '../middleware/uploadMiddleware.js';
 export class AdminController {
     // ==================== DASHBOARD ====================
     static async getDashboardStats(c) {
@@ -48,7 +50,7 @@ export class AdminController {
                     .select(`
             *,
             service:services(name, price),
-            user:users(name, email, phone),
+            user:users!bookings_user_id_fkey(name, email, phone),
             payments(status, amount)
           `)
                     .order('created_at', { ascending: false })
@@ -58,7 +60,7 @@ export class AdminController {
                     .select(`
             *,
             service:services(name),
-            user:users(name, email, phone)
+            user:users!bookings_user_id_fkey(name, email, phone)
           `)
                     .gte('date', now.toISOString().split('T')[0])
                     .lte('date', new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
@@ -84,7 +86,7 @@ export class AdminController {
                 .select('created_at, status')
                 .gte('created_at', thirtyDaysAgo.toISOString());
             // Process trend data
-            const trendData = this.processTrendData(bookingTrend || [], period);
+            const trendData = AdminController.processTrendData(bookingTrend || [], period);
             // Fix: Add null checks for counts
             const totalBookingsCount = totalBookings.count || 0;
             const completedBookingsCount = completedBookings.count || 0;
@@ -160,19 +162,39 @@ export class AdminController {
                 return c.json({ error: 'Admin access required' }, 403);
             }
             const body = await c.req.json();
-            const validated = serviceSchema.parse(body);
+            const { crops, ...serviceData } = serviceSchema.parse(body);
             const { data: service, error } = await supabase
                 .from('services')
-                .insert(validated)
+                .insert(serviceData)
+                .select()
+                .single();
+            if (error)
+                throw error;
+            // Handle linked crops
+            if (crops && crops.length > 0) {
+                const cropLinks = crops.map(crop_id => ({
+                    service_id: service.id,
+                    crop_id
+                }));
+                const { error: linkError } = await supabase
+                    .from('service_crops')
+                    .insert(cropLinks);
+                if (linkError) {
+                    console.error('Link crops error:', linkError);
+                    // Don't fail the whole thing, but maybe log it
+                }
+            }
+            // Fetch complete service with relations
+            const { data: fullService } = await supabase
+                .from('services')
                 .select(`
           *,
           featured_media:media_library(*),
           service_crops:crops(*)
         `)
+                .eq('id', service.id)
                 .single();
-            if (error)
-                throw error;
-            return c.json({ service }, 201);
+            return c.json({ service: fullService }, 201);
         }
         catch (error) {
             console.error('Create service error:', error);
@@ -187,23 +209,47 @@ export class AdminController {
             }
             const id = c.req.param('id');
             const body = await c.req.json();
-            const validated = serviceSchema.partial().parse(body);
+            const { crops, ...serviceData } = serviceSchema.partial().parse(body);
             const { data: service, error } = await supabase
                 .from('services')
-                .update(validated)
+                .update(serviceData)
                 .eq('id', id)
-                .select(`
-          *,
-          featured_media:media_library(*),
-          service_crops:crops(*)
-        `)
+                .select()
                 .single();
             if (error)
                 throw error;
             if (!service) {
                 return c.json({ error: 'Service not found' }, 404);
             }
-            return c.json({ service });
+            // Sync linked crops if provided
+            if (crops !== undefined) {
+                // Delete old links
+                await supabase
+                    .from('service_crops')
+                    .delete()
+                    .eq('service_id', id);
+                // Add new links
+                if (crops.length > 0) {
+                    const cropLinks = crops.map(crop_id => ({
+                        service_id: id,
+                        crop_id
+                    }));
+                    await supabase
+                        .from('service_crops')
+                        .insert(cropLinks);
+                }
+            }
+            // Fetch updated service with relations
+            const { data: fullService } = await supabase
+                .from('services')
+                .select(`
+          *,
+          featured_media:media_library(*),
+          service_crops:crops(*)
+        `)
+                .eq('id', id)
+                .single();
+            return c.json({ service: fullService });
         }
         catch (error) {
             console.error('Update service error:', error);
@@ -217,6 +263,12 @@ export class AdminController {
                 return c.json({ error: 'Admin access required' }, 403);
             }
             const id = c.req.param('id');
+            // Get service info for media cleanup
+            const { data: service } = await supabase
+                .from('services')
+                .select('featured_media_id')
+                .eq('id', id)
+                .single();
             // Check if service has bookings
             const { data: bookings, error: bookingsError } = await supabase
                 .from('bookings')
@@ -227,16 +279,25 @@ export class AdminController {
                 throw bookingsError;
             if (bookings && bookings.length > 0) {
                 return c.json({
-                    error: 'Cannot delete service with active bookings',
+                    error: `Cannot delete service. It has ${bookings.length} active booking(s). Please cancel or reassign them first.`,
                     active_bookings: bookings.length
                 }, 400);
             }
+            // Delete linked crops first
+            await supabase
+                .from('service_crops')
+                .delete()
+                .eq('service_id', id);
             const { error } = await supabase
                 .from('services')
                 .delete()
                 .eq('id', id);
             if (error)
                 throw error;
+            // Cleanup media if requested and exists
+            if (service?.featured_media_id) {
+                await AdminController.deleteMediaInternal(service.featured_media_id);
+            }
             return c.json({
                 message: 'Service deleted successfully',
                 deleted_id: id
@@ -244,7 +305,7 @@ export class AdminController {
         }
         catch (error) {
             console.error('Delete service error:', error);
-            return c.json({ error: 'Failed to delete service' }, 500);
+            return c.json({ error: 'Failed to delete service. It may be linked to other resources.' }, 500);
         }
     }
     static async linkCropToService(c) {
@@ -316,9 +377,10 @@ export class AdminController {
             }
             const body = await c.req.json();
             const validated = cropSchema.parse(body);
+            const { media_ids, ...cropData } = validated;
             const { data: crop, error } = await supabase
                 .from('crops')
-                .insert(validated)
+                .insert(cropData)
                 .select(`
           *,
           featured_media:media_library(*),
@@ -327,7 +389,36 @@ export class AdminController {
                 .single();
             if (error)
                 throw error;
-            return c.json({ crop }, 201);
+            // Handle extra media if provided
+            if (media_ids && media_ids.length > 0) {
+                const cropMediaRecords = media_ids.map((media_id, index) => ({
+                    crop_id: crop.id,
+                    media_id,
+                    display_order: index
+                }));
+                const { error: mediaError } = await supabase
+                    .from('crop_media')
+                    .insert(cropMediaRecords);
+                if (mediaError) {
+                    console.error('Error linking additional media to crop:', mediaError);
+                }
+            }
+            // Re-fetch to include linked media
+            const { data: updatedCrop } = await supabase
+                .from('crops')
+                .select(`
+          *,
+          featured_media:media_library(*),
+          service_crops:services(*),
+          crop_media:crop_media(
+            id,
+            display_order,
+            media:media_library(*)
+          )
+        `)
+                .eq('id', crop.id)
+                .single();
+            return c.json({ crop: updatedCrop || crop }, 201);
         }
         catch (error) {
             console.error('Create crop error:', error);
@@ -343,9 +434,10 @@ export class AdminController {
             const id = c.req.param('id');
             const body = await c.req.json();
             const validated = cropSchema.partial().parse(body);
+            const { media_ids, ...cropData } = validated;
             const { data: crop, error } = await supabase
                 .from('crops')
-                .update(validated)
+                .update(cropData)
                 .eq('id', id)
                 .select(`
           *,
@@ -358,7 +450,43 @@ export class AdminController {
             if (!crop) {
                 return c.json({ error: 'Crop not found' }, 404);
             }
-            return c.json({ crop });
+            // Handle extra media if provided
+            if (media_ids !== undefined) {
+                // Delete existing links
+                await supabase
+                    .from('crop_media')
+                    .delete()
+                    .eq('crop_id', id);
+                if (media_ids.length > 0) {
+                    const cropMediaRecords = media_ids.map((media_id, index) => ({
+                        crop_id: id,
+                        media_id,
+                        display_order: index
+                    }));
+                    const { error: mediaError } = await supabase
+                        .from('crop_media')
+                        .insert(cropMediaRecords);
+                    if (mediaError) {
+                        console.error('Error updating additional media for crop:', mediaError);
+                    }
+                }
+            }
+            // Re-fetch to include linked media
+            const { data: updatedCrop } = await supabase
+                .from('crops')
+                .select(`
+          *,
+          featured_media:media_library(*),
+          service_crops:services(*),
+          crop_media:crop_media(
+            id,
+            display_order,
+            media:media_library(*)
+          )
+        `)
+                .eq('id', id)
+                .single();
+            return c.json({ crop: updatedCrop || crop });
         }
         catch (error) {
             console.error('Update crop error:', error);
@@ -372,6 +500,12 @@ export class AdminController {
                 return c.json({ error: 'Admin access required' }, 403);
             }
             const id = c.req.param('id');
+            // Get crop info for media cleanup
+            const { data: crop } = await supabase
+                .from('crops')
+                .select('featured_media_id')
+                .eq('id', id)
+                .single();
             // Check if crop is linked to services
             const { data: serviceLinks } = await supabase
                 .from('service_crops')
@@ -383,12 +517,21 @@ export class AdminController {
                     linked_services: serviceLinks.length
                 }, 400);
             }
+            // Delete linked media records
+            await supabase
+                .from('crop_media')
+                .delete()
+                .eq('crop_id', id);
             const { error } = await supabase
                 .from('crops')
                 .delete()
                 .eq('id', id);
             if (error)
                 throw error;
+            // Cleanup featured media
+            if (crop?.featured_media_id) {
+                await AdminController.deleteMediaInternal(crop.featured_media_id);
+            }
             return c.json({
                 message: 'Crop deleted successfully',
                 deleted_id: id
@@ -406,11 +549,26 @@ export class AdminController {
             if (user.role !== 'admin') {
                 return c.json({ error: 'Admin access required' }, 403);
             }
-            const body = await c.req.json();
+            // Handle direct file upload if present
+            const uploadedMediaId = await AdminController.uploadFileInternal(c, 'project');
+            let body = await c.req.parseBody();
+            // If it's JSON, parseBody might work or not depending on context. 
+            // But uploadMiddleware should have handled its part.
+            // If body is empty or doesn't have name, try json()
+            if (!body.name) {
+                try {
+                    body = await c.req.json();
+                }
+                catch (e) { }
+            }
             const validated = projectSchema.parse(body);
+            const { media_ids, ...projectData } = validated;
+            if (uploadedMediaId) {
+                projectData.featured_media_id = uploadedMediaId;
+            }
             const { data: project, error } = await supabase
                 .from('projects')
-                .insert(validated)
+                .insert(projectData)
                 .select(`
           *,
           featured_media:media_library(*),
@@ -421,7 +579,35 @@ export class AdminController {
                 .single();
             if (error)
                 throw error;
-            return c.json({ project }, 201);
+            // Handle extra media if provided
+            if (media_ids && media_ids.length > 0) {
+                const projectMediaRecords = media_ids.map((media_id, index) => ({
+                    project_id: project.id,
+                    media_id,
+                    display_order: index
+                }));
+                const { error: mediaError } = await supabase
+                    .from('project_media')
+                    .insert(projectMediaRecords);
+                if (mediaError) {
+                    console.error('Error linking additional media to project:', mediaError);
+                }
+            }
+            // Re-fetch to include linked media
+            const { data: updatedProject } = await supabase
+                .from('projects')
+                .select(`
+          *,
+          featured_media:media_library(*),
+          project_media:project_media(
+            id,
+            display_order,
+            media:media_library(*)
+          )
+        `)
+                .eq('id', project.id)
+                .single();
+            return c.json({ project: updatedProject || project }, 201);
         }
         catch (error) {
             console.error('Create project error:', error);
@@ -435,11 +621,23 @@ export class AdminController {
                 return c.json({ error: 'Admin access required' }, 403);
             }
             const id = c.req.param('id');
-            const body = await c.req.json();
+            // Handle direct file upload if present
+            const uploadedMediaId = await AdminController.uploadFileInternal(c, 'project');
+            let body = await c.req.parseBody();
+            if (!body.name && !body.description && !body.status) {
+                try {
+                    body = await c.req.json();
+                }
+                catch (e) { }
+            }
             const validated = projectSchema.partial().parse(body);
+            const { media_ids, ...projectData } = validated;
+            if (uploadedMediaId) {
+                projectData.featured_media_id = uploadedMediaId;
+            }
             const { data: project, error } = await supabase
                 .from('projects')
-                .update(validated)
+                .update(projectData)
                 .eq('id', id)
                 .select(`
           *,
@@ -454,7 +652,42 @@ export class AdminController {
             if (!project) {
                 return c.json({ error: 'Project not found' }, 404);
             }
-            return c.json({ project });
+            // Handle extra media if provided
+            if (media_ids !== undefined) {
+                // Delete existing links
+                await supabase
+                    .from('project_media')
+                    .delete()
+                    .eq('project_id', id);
+                if (media_ids.length > 0) {
+                    const projectMediaRecords = media_ids.map((media_id, index) => ({
+                        project_id: id,
+                        media_id,
+                        display_order: index
+                    }));
+                    const { error: mediaError } = await supabase
+                        .from('project_media')
+                        .insert(projectMediaRecords);
+                    if (mediaError) {
+                        console.error('Error updating additional media for project:', mediaError);
+                    }
+                }
+            }
+            // Re-fetch to include linked media
+            const { data: updatedProject } = await supabase
+                .from('projects')
+                .select(`
+          *,
+          featured_media:media_library(*),
+          project_media:project_media(
+            id,
+            display_order,
+            media:media_library(*)
+          )
+        `)
+                .eq('id', id)
+                .single();
+            return c.json({ project: updatedProject || project });
         }
         catch (error) {
             console.error('Update project error:', error);
@@ -468,13 +701,17 @@ export class AdminController {
                 return c.json({ error: 'Admin access required' }, 403);
             }
             const id = c.req.param('id');
+            // Get project info for media cleanup
+            const { data: project } = await supabase
+                .from('projects')
+                .select('featured_media_id')
+                .eq('id', id)
+                .single();
             // Delete project media associations first
-            const { error: mediaError } = await supabase
+            await supabase
                 .from('project_media')
                 .delete()
                 .eq('project_id', id);
-            if (mediaError)
-                throw mediaError;
             // Delete project
             const { error } = await supabase
                 .from('projects')
@@ -482,6 +719,10 @@ export class AdminController {
                 .eq('id', id);
             if (error)
                 throw error;
+            // Cleanup featured media
+            if (project?.featured_media_id) {
+                await AdminController.deleteMediaInternal(project.featured_media_id);
+            }
             return c.json({
                 message: 'Project deleted successfully',
                 deleted_id: id
@@ -745,13 +986,17 @@ export class AdminController {
                 return c.json({ error: 'Admin access required' }, 403);
             }
             const id = c.req.param('id');
+            // Get tip info for media cleanup
+            const { data: tip } = await supabase
+                .from('tips')
+                .select('featured_media_id')
+                .eq('id', id)
+                .single();
             // Delete tip media associations first
-            const { error: mediaError } = await supabase
+            await supabase
                 .from('tip_media')
                 .delete()
                 .eq('tip_id', id);
-            if (mediaError)
-                throw mediaError;
             // Delete tip
             const { error } = await supabase
                 .from('tips')
@@ -759,6 +1004,10 @@ export class AdminController {
                 .eq('id', id);
             if (error)
                 throw error;
+            // Cleanup featured media
+            if (tip?.featured_media_id) {
+                await AdminController.deleteMediaInternal(tip.featured_media_id);
+            }
             return c.json({
                 message: 'Tip deleted successfully',
                 deleted_id: id
@@ -818,7 +1067,7 @@ export class AdminController {
                 .select(`
           *,
           service:services(*),
-          user:users(name, email, phone),
+          user:users!bookings_user_id_fkey(name, email, phone),
           payments(*)
         `, { count: 'exact' })
                 .order('date', { ascending: false })
@@ -878,7 +1127,7 @@ export class AdminController {
                 .select(`
           *,
           service:services(*),
-          user:users(*)
+          user:users!bookings_user_id_fkey(*)
         `)
                 .single();
             if (error)
@@ -923,7 +1172,7 @@ export class AdminController {
                 .select(`
           *,
           service:services(*),
-          user:users(*)
+          user:users!bookings_user_id_fkey(*)
         `)
                 .single();
             if (error)
@@ -986,7 +1235,7 @@ export class AdminController {
           email,
           phone,
           role,
-          profile_media:media_library(*),
+          profile_media:media_library!users_profile_media_id_fkey(*),
           created_at,
           updated_at
         `, { count: 'exact' })
@@ -1070,6 +1319,69 @@ export class AdminController {
         catch (error) {
             console.error('Update user role error:', error);
             return c.json({ error: 'Failed to update user role' }, 400);
+        }
+    }
+    static async deleteUser(c) {
+        try {
+            const user = c.get('user');
+            if (user.role !== 'admin') {
+                return c.json({ error: 'Admin access required' }, 403);
+            }
+            const id = c.req.param('id');
+            // Prevent deleting self
+            if (id === user.userId) {
+                return c.json({ error: 'Cannot delete your own account' }, 400);
+            }
+            // Check if user has bookings
+            const { data: bookings } = await supabase
+                .from('bookings')
+                .select('id')
+                .eq('user_id', id);
+            if (bookings && bookings.length > 0) {
+                return c.json({
+                    error: 'Cannot delete user with existing bookings',
+                    active_bookings: bookings.length
+                }, 400);
+            }
+            // Check if user authored any tips
+            const { data: tips } = await supabase
+                .from('tips')
+                .select('id')
+                .eq('author_id', id);
+            if (tips && tips.length > 0) {
+                return c.json({
+                    error: 'Cannot delete user who has authored tips. Please reassign or delete their content first.',
+                    authored_tips: tips.length
+                }, 400);
+            }
+            // Check if user uploaded media (optional: or just let database CASCADE if configured, but better to be safe)
+            // For now, let's assume we want to prevent orphan media or complicated cascades
+            const { data: media } = await supabase
+                .from('media_library')
+                .select('id')
+                .eq('uploaded_by', id);
+            if (media && media.length > 0) {
+                // Option: Cascade delete? Or block? 
+                // Let's block for safety as requested in plan
+                return c.json({
+                    error: 'Cannot delete user who has uploaded media files. Please clean up their media library first.',
+                    uploaded_media: media.length
+                }, 400);
+            }
+            const { error } = await supabase
+                .from('users')
+                .delete()
+                .eq('id', id);
+            if (error)
+                throw error;
+            return c.json({
+                message: 'User deleted successfully',
+                deleted_id: id
+            });
+        }
+        catch (error) {
+            console.error('Delete user error:', error);
+            return c.json({ error: 'Failed to delete user' }, 500);
         }
     }
     // ==================== AVAILABILITY MANAGEMENT ====================
@@ -1225,7 +1537,7 @@ export class AdminController {
                         .select(`
               *,
               service:services(*),
-              user:users(*),
+              user:users!bookings_user_id_fkey(*),
               payments(*)
             `);
                     if (start_date)
@@ -1275,6 +1587,67 @@ export class AdminController {
         catch (error) {
             console.error('Export data error:', error);
             return c.json({ error: 'Failed to export data' }, 500);
+        }
+    }
+    // ==================== HELPERS ====================
+    static async deleteMediaInternal(mediaId) {
+        try {
+            const { data: media, error: fetchError } = await supabase
+                .from('media_library')
+                .select('public_id')
+                .eq('id', mediaId)
+                .single();
+            if (fetchError || !media)
+                return;
+            await CloudinaryService.deleteFile(media.public_id);
+            await supabase.from('media_library').delete().eq('id', mediaId);
+        }
+        catch (error) {
+            console.error('Delete media internal error:', error);
+        }
+    }
+    static async uploadFileInternal(c, category) {
+        try {
+            const file = getUploadedFile(c);
+            if (!file)
+                return null;
+            const user = c.get('user');
+            const folder = getFolderForCategory(category);
+            const resourceType = getResourceType(file.mimetype);
+            const uploadResult = await CloudinaryService.uploadFile(file.buffer, {
+                folder,
+                resource_type: resourceType,
+                tags: [category]
+            });
+            let mediaType = 'image';
+            if (resourceType === 'video')
+                mediaType = 'video';
+            if (resourceType === 'raw')
+                mediaType = 'document';
+            const mimeType = CloudinaryService.getMimeTypeFromResourceType(uploadResult.resource_type, uploadResult.format);
+            const { data: media, error } = await supabase
+                .from('media_library')
+                .insert({
+                public_id: uploadResult.public_id,
+                url: uploadResult.secure_url,
+                type: mediaType,
+                category,
+                file_size: uploadResult.bytes,
+                mime_type: mimeType,
+                width: uploadResult.width,
+                height: uploadResult.height,
+                duration: uploadResult.duration,
+                uploaded_by: user.userId,
+            })
+                .select()
+                .single();
+            if (error)
+                throw error;
+            return media.id;
+        }
+        catch (e) {
+            console.error('Internal upload error:', e);
+            return null;
         }
     }
 }

@@ -1,0 +1,408 @@
+DROP EXTENSION "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+DROP TYPE booking_status,payment_status,notification_type,media_type, media_category, tip_status;
+
+CREATE TYPE user_role AS ENUM ('admin','client');
+CREATE TYPE booking_status AS ENUM ('pending','paid','confirmed','completed','cancelled');
+CREATE TYPE payment_status AS ENUM ('pending','success','failed');
+CREATE TYPE notification_type AS ENUM ('booking_confirmation','reminder','payment_receipt');
+CREATE TYPE media_type AS ENUM ('image','video','document');
+CREATE TYPE media_category AS ENUM (
+  'homepage','project','crop','testimonial','profile','service','gallery','receipt','tip'
+);
+CREATE TYPE tip_status AS ENUM ('draft','published','archived');
+
+
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(20),
+    email VARCHAR(255) UNIQUE,
+    password_hash VARCHAR(255),
+    role user_role NOT NULL DEFAULT 'client',
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE media_library (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    public_id VARCHAR(255) NOT NULL UNIQUE,
+    url VARCHAR(500) NOT NULL,
+    type media_type NOT NULL,
+    category media_category,
+    alt_text VARCHAR(255),
+    description TEXT,
+    file_size BIGINT,
+    mime_type VARCHAR(100),
+    width INT,
+    height INT,
+    duration INT,
+    uploaded_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+ALTER TABLE users
+ADD COLUMN profile_media_id UUID REFERENCES media_library(id);
+
+
+CREATE TABLE services (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    duration_mins INT NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    featured_media_id UUID REFERENCES media_library(id),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+
+CREATE TABLE crops (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    featured_media_id UUID REFERENCES media_library(id),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+
+CREATE TABLE service_crops (
+    service_id UUID REFERENCES services(id) ON DELETE CASCADE,
+    crop_id UUID REFERENCES crops(id) ON DELETE CASCADE,
+    PRIMARY KEY (service_id, crop_id)
+);
+
+
+CREATE TABLE projects (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    featured_media_id UUID REFERENCES media_library(id),
+    start_date DATE,
+    end_date DATE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+
+CREATE TABLE project_media (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+    media_id UUID REFERENCES media_library(id) ON DELETE CASCADE,
+    caption TEXT,
+    display_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+
+CREATE TABLE testimonials (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_name VARCHAR(255),
+    comment TEXT NOT NULL,
+    rating INT CHECK (rating BETWEEN 1 AND 5),
+    project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+    user_media_id UUID REFERENCES media_library(id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+
+CREATE TABLE bookings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    admin_id UUID REFERENCES users(id),
+    service_id UUID REFERENCES services(id) ON DELETE CASCADE,
+    date DATE NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    status booking_status NOT NULL DEFAULT 'pending',
+    meeting_link VARCHAR(500),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX unique_admin_booking
+ON bookings (admin_id, date, start_time);
+
+
+CREATE TABLE payments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID REFERENCES bookings(id) ON DELETE CASCADE,
+    amount DECIMAL(10,2) NOT NULL,
+    status payment_status NOT NULL DEFAULT 'pending',
+    transaction_id VARCHAR(255),
+    receipt_media_id UUID REFERENCES media_library(id),
+    paid_at TIMESTAMP
+);
+
+
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    type notification_type NOT NULL,
+    message TEXT NOT NULL,
+    sent_at TIMESTAMP,
+    read BOOLEAN DEFAULT FALSE
+);
+
+
+CREATE TABLE tips (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) UNIQUE NOT NULL,
+    content TEXT NOT NULL,
+    excerpt TEXT,
+    featured_media_id UUID REFERENCES media_library(id),
+    author_id UUID REFERENCES users(id),
+    status tip_status DEFAULT 'draft',
+    published_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+
+CREATE TABLE tip_media (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tip_id UUID REFERENCES tips(id) ON DELETE CASCADE,
+    media_id UUID REFERENCES media_library(id) ON DELETE CASCADE,
+    caption TEXT,
+    display_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+
+
+CREATE INDEX idx_bookings_user ON bookings(user_id);
+CREATE INDEX idx_bookings_date_time ON bookings(date, start_time);
+CREATE INDEX idx_payments_status ON payments(status);
+CREATE INDEX idx_notifications_user ON notifications(user_id);
+CREATE INDEX idx_media_category ON media_library(category);
+CREATE INDEX idx_media_uploaded_by ON media_library(uploaded_by);
+CREATE INDEX idx_tips_status ON tips(status);
+
+
+
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_users_updated_at
+BEFORE UPDATE ON users
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_services_updated_at
+BEFORE UPDATE ON services
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_crops_updated_at
+BEFORE UPDATE ON crops
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_projects_updated_at
+BEFORE UPDATE ON projects
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_media_updated_at
+BEFORE UPDATE ON media_library
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_tips_updated_at
+BEFORE UPDATE ON tips
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+
+
+
+
+-- Admin user
+INSERT INTO users (id, name, phone, email, password_hash, role)
+VALUES (
+  uuid_generate_v4(),
+  'Admin User',
+  '+254700000001',
+  'admin@example.com',
+  'hashed_password_here',
+  'admin'
+);
+
+-- Client user
+INSERT INTO users (id, name, phone, email, password_hash, role)
+VALUES (
+  uuid_generate_v4(),
+  'John Client',
+  '+254700000002',
+  'client@example.com',
+  'hashed_password_here',
+  'client'
+);
+
+
+INSERT INTO media_library (
+  id, public_id, url, type, category, alt_text, uploaded_by
+)
+VALUES
+(
+  uuid_generate_v4(),
+  'hero-image',
+  'https://m.economictimes.com/news/economy/agriculture/indias-agri-sector-transformed-by-five-fold-budget-surge-over-11-years-govt/articleshow/121692654.cms',
+  'image',
+  'homepage',
+  'Homepage banner',
+  (SELECT id FROM users WHERE role='admin' LIMIT 1)
+),
+(
+  uuid_generate_v4(),
+  'service-image',
+  'https://www.europeanbusinessreview.com/investing-in-sustainable-agriculture-for-climate-mitigation-and-food-security/',
+  'image',
+  'service',
+  'Service image',
+  (SELECT id FROM users WHERE role='admin' LIMIT 1)
+),
+(
+  uuid_generate_v4(),
+  'tip-image',
+  'https://www.aeromotus.com/drone-news/precision-agriculture-with-drone-technology/?srsltid=AfmBOoqcJPAOD31Q0dxTsZlKWcPhIasNnWVjtKUKHbsu4cVLdvoTsCrU',
+  'image',
+  'tip',
+  'Tip featured image',
+  (SELECT id FROM users WHERE role='admin' LIMIT 1)
+);
+
+
+INSERT INTO services (
+  id, name, description, duration_mins, price, featured_media_id
+)
+VALUES (
+  uuid_generate_v4(),
+  'Crop Consultation',
+  'Professional crop advisory service',
+  60,
+  2500.00,
+  (SELECT id FROM media_library WHERE category='service' LIMIT 1)
+);
+
+INSERT INTO crops (id, name, description)
+VALUES
+(uuid_generate_v4(), 'Maize', 'Staple crop'),
+(uuid_generate_v4(), 'Wheat', 'Cereal crop');
+
+
+INSERT INTO service_crops (service_id, crop_id)
+SELECT
+  (SELECT id FROM services LIMIT 1),
+  id
+FROM crops;
+
+
+INSERT INTO projects (
+  id, name, description, start_date, end_date, featured_media_id
+)
+VALUES (
+  uuid_generate_v4(),
+  'Green Farm Project',
+  'Sustainable farming initiative',
+  '2024-01-01',
+  '2024-06-30',
+  (SELECT id FROM media_library WHERE category='homepage' LIMIT 1)
+);
+
+
+INSERT INTO project_media (project_id, media_id, caption)
+VALUES (
+  (SELECT id FROM projects LIMIT 1),
+  (SELECT id FROM media_library LIMIT 1),
+  'Project showcase image'
+);
+
+INSERT INTO testimonials (
+  user_name, comment, rating, project_id
+)
+VALUES (
+  'Jane Farmer',
+  'Excellent service and support!',
+  5,
+  (SELECT id FROM projects LIMIT 1)
+);
+
+
+INSERT INTO bookings (
+  id, user_id, admin_id, service_id,
+  date, start_time, end_time, status
+)
+VALUES (
+  uuid_generate_v4(),
+  (SELECT id FROM users WHERE role='client' LIMIT 1),
+  (SELECT id FROM users WHERE role='admin' LIMIT 1),
+  (SELECT id FROM services LIMIT 1),
+  CURRENT_DATE + INTERVAL '1 day',
+  '10:00',
+  '11:00',
+  'confirmed'
+);
+
+
+INSERT INTO payments (
+  booking_id, amount, status, transaction_id, paid_at
+)
+VALUES (
+  (SELECT id FROM bookings LIMIT 1),
+  2500.00,
+  'success',
+  'TXN123456',
+  NOW()
+);
+
+
+
+INSERT INTO notifications (
+  user_id, type, message, sent_at
+)
+VALUES (
+  (SELECT id FROM users WHERE role='client' LIMIT 1),
+  'booking_confirmation',
+  'Your booking has been confirmed.',
+  NOW()
+);
+
+
+INSERT INTO tips (
+  id, title, slug, content, excerpt,
+  featured_media_id, author_id, status, published_at
+)
+VALUES (
+  uuid_generate_v4(),
+  'Best Farming Practices',
+  'best-farming-practices',
+  'Detailed content about sustainable farming.',
+  'Learn the best farming tips.',
+  (SELECT id FROM media_library WHERE category='tip' LIMIT 1),
+  (SELECT id FROM users WHERE role='admin' LIMIT 1),
+  'published',
+  NOW()
+);
+
+
+INSERT INTO tip_media (
+  tip_id, media_id, caption
+)
+VALUES (
+  (SELECT id FROM tips LIMIT 1),
+  (SELECT id FROM media_library WHERE category='tip' LIMIT 1),
+  'Tip illustration'
+);
+
+
+select * from users
+
+
+UPDATE users
+SET role = 'admin', updated_at = NOW()
+WHERE email = 'farmwithirene@gmail.com';
+
+ALTER TYPE notification_type ADD VALUE IF NOT EXISTS 'info';

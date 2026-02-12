@@ -20,30 +20,43 @@ else if (result.parsed) {
 // Debug: Show what's actually loaded
 console.log("\n=== Current process.env ===");
 console.log("SUPABASE_URL:", process.env.SUPABASE_URL || "UNDEFINED");
-console.log("SUPABASE_SERVICE_KEY:", process.env.SUPABASE_SERVICE_KEY || "UNDEFINED");
+console.log("SUPABASE_SERVICE_KEY:", (process.env.SUPABASE_SERVICE_KEY || "UNDEFINED").substring(0, 10) + "...");
+console.log("DARAJA_KEY:", (process.env.DARAJA_CONSUMER_KEY || "UNDEFINED").substring(0, 5) + "...");
+console.log("DARAJA_SECRET:", (process.env.DARAJA_CONSUMER_SECRET || "UNDEFINED").substring(0, 5) + "...");
 // Create env object with defaults
 export const env = {
-    SUPABASE_URL: process.env.SUPABASE_URL || "",
-    SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY || "",
-    PORT: process.env.PORT || "3001",
-    NODE_ENV: process.env.NODE_ENV || "development",
-    CORS_ORIGIN: process.env.CORS_ORIGIN || "http://localhost:5174",
-    DATABASE_URL: process.env.DATABASE_URL || "",
-    JWT_SECRET: process.env.JWT_SECRET || "",
-    CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || "",
-    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || "",
-    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || "",
+    SUPABASE_URL: (process.env.SUPABASE_URL || "").trim(),
+    SUPABASE_SERVICE_KEY: (process.env.SUPABASE_SERVICE_KEY || "").trim(),
+    PORT: (process.env.PORT || "3001").trim(),
+    NODE_ENV: (process.env.NODE_ENV || "development"),
+    CORS_ORIGIN: (process.env.CORS_ORIGIN || "http://localhost:5174").trim(),
+    BASE_URL: (process.env.BASE_URL || "http://localhost:3001").trim(),
+    DATABASE_URL: (process.env.DATABASE_URL || "").trim(),
+    JWT_SECRET: (process.env.JWT_SECRET || "").trim(),
+    CLOUDINARY_CLOUD_NAME: (process.env.CLOUDINARY_CLOUD_NAME || "").trim(),
+    CLOUDINARY_API_KEY: (process.env.CLOUDINARY_API_KEY || "").trim(),
+    CLOUDINARY_API_SECRET: (process.env.CLOUDINARY_API_SECRET || "").trim(),
+    DARAJA_CONSUMER_KEY: (process.env.DARAJA_CONSUMER_KEY || "").trim(),
+    DARAJA_CONSUMER_SECRET: (process.env.DARAJA_CONSUMER_SECRET || "").trim(),
+    DARAJA_SHORTCODE: (process.env.DARAJA_SHORTCODE || "174379").trim(),
+    DARAJA_PASSKEY: (process.env.DARAJA_PASSKEY || "").trim(),
 };
 // Validation function
 export const validateEnv = () => {
     console.log("\n=== Validating Environment ===");
-    if (!env.SUPABASE_URL) {
-        console.error("❌ SUPABASE_URL is missing");
-        return false;
-    }
-    if (!env.SUPABASE_SERVICE_KEY) {
-        console.error("❌ SUPABASE_SERVICE_KEY is missing");
-        return false;
+    const required = [
+        'SUPABASE_URL',
+        'SUPABASE_SERVICE_KEY',
+        'JWT_SECRET',
+        'DARAJA_CONSUMER_KEY',
+        'DARAJA_CONSUMER_SECRET',
+        'DARAJA_PASSKEY'
+    ];
+    for (const key of required) {
+        if (!env[key]) {
+            console.error(`❌ ${key} is missing`);
+            return false;
+        }
     }
     console.log("✅ All required environment variables are present");
     console.log(`📁 NODE_ENV: ${env.NODE_ENV}`);

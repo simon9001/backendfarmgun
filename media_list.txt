@@ -1,0 +1,44 @@
+Looking for .env at: C:\Users\ADMIN001\project0001\the-backend\backendcode\.env
+[dotenv@17.2.3] injecting env (14) from .env -- tip: ΓÜÖ∩╕Å  load multiple .env files with { path: ['.env.local', '.env'] }
+Γ£à .env file loaded successfully
+Found variables: [
+  'PORT',
+  'NODE_ENV',
+  'BASE_URL',
+  'CORS_ORIGIN',
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_KEY',
+  'JWT_SECRET',
+  'CLOUDINARY_CLOUD_NAME',
+  'CLOUDINARY_API_KEY',
+  'CLOUDINARY_API_SECRET',
+  'DARAJA_CONSUMER_KEY',
+  'DARAJA_CONSUMER_SECRET',
+  'DARAJA_SHORTCODE',
+  'DARAJA_PASSKEY'
+]
+
+=== Current process.env ===
+SUPABASE_URL: https://jjmwnrmlaxpvojoctete.supabase.co
+SUPABASE_SERVICE_KEY: eyJhbGciOi...
+DARAJA_KEY: WTMbr...
+DARAJA_SECRET: sdwTU...
+
+=== Validating Environment ===
+Γ£à All required environment variables are present
+≡ƒôü NODE_ENV: development
+≡ƒÜ¬ PORT: 3001
+≡ƒîÉ CORS_ORIGIN: http://localhost:5173
+Creating Supabase client with URL: https://jjmwnrmlaxpvojoctete.supabase.co
+Γ£à Supabase client created successfully
+--- Media Library ---
+ID: 27a91c2f-89cc-4966-a81a-40255e489a45 | Public ID: hero-image | URL: https://m.economictimes.com/news/economy/agriculture/indias-agri-sector-transformed-by-five-fold-budget-surge-over-11-years-govt/articleshow/121692654.cms
+ID: 46c31ab2-1c4e-480e-ab13-de1da76f7260 | Public ID: service-image | URL: https://www.europeanbusinessreview.com/investing-in-sustainable-agriculture-for-climate-mitigation-and-food-security/
+ID: cd2e3b19-3c79-42ce-b33f-3173ea083d32 | Public ID: tip-image | URL: https://www.aeromotus.com/drone-news/precision-agriculture-with-drone-technology/?srsltid=AfmBOoqcJPAOD31Q0dxTsZlKWcPhIasNnWVjtKUKHbsu4cVLdvoTsCrU
+ID: 718d5bc3-0f3a-423c-89a3-77066a3ef75e | Public ID: general/t4yitkujimhlzbdtgrvs | URL: https://res.cloudinary.com/dfhzcvbof/image/upload/v1770835881/general/t4yitkujimhlzbdtgrvs.jpg
+ID: 63302d06-ba4b-45a3-a892-958902c4f727 | Public ID: general/hkn8fmdzd8mvukxcmavc | URL: https://res.cloudinary.com/dfhzcvbof/image/upload/v1770836835/general/hkn8fmdzd8mvukxcmavc.jpg
+ID: aefce4b7-aa81-4fc7-aba4-296137e790f6 | Public ID: general/izvcan4tnwodnis87rmv | URL: https://res.cloudinary.com/dfhzcvbof/image/upload/v1770836845/general/izvcan4tnwodnis87rmv.jpg
+ID: 08787ede-7289-4506-8e31-068434565876 | Public ID: general/d4u39n9qykshcjqtpn3o | URL: https://res.cloudinary.com/dfhzcvbof/image/upload/v1770836858/general/d4u39n9qykshcjqtpn3o.jpg
+ID: fc16ea04-52bd-489a-89a7-f75f39e06998 | Public ID: general/tkgcidts52fvos1szcta | URL: https://res.cloudinary.com/dfhzcvbof/image/upload/v1770837226/general/tkgcidts52fvos1szcta.jpg
+ID: e12678e2-9bbe-492d-aa7f-2615662d5035 | Public ID: general/c7uin4l5cef06nquhari | URL: https://res.cloudinary.com/dfhzcvbof/image/upload/v1770837238/general/c7uin4l5cef06nquhari.jpg
+ID: 715f7c97-1460-48a6-925c-c1d5f8e7ccc2 | Public ID: general/bwqrwlvuu8bgzmicwwt2 | URL: https://res.cloudinary.com/dfhzcvbof/image/upload/v1770837249/general/bwqrwlvuu8bgzmicwwt2.webp

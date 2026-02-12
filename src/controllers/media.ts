@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { supabase } from '../db/supabaseClient.js';
 import { CloudinaryService } from '../utils/cloudinary.js';
-import { getUploadedFile, getUploadedFiles, getFolderForCategory, getResourceType } from '../middleware/uploadMiddleware.js';
+import { getUploadedFile, getUploadedFiles, getFolderForCategory, getResourceType, getParsedBody } from '../middleware/uploadMiddleware.js';
 // Remove unused import
 // import { mediaSchema } from '../utils/validation.js';
 import { MediaCategory, MediaType } from '../types/index.js';
@@ -33,8 +33,20 @@ export class MediaController {
         return c.json({ error: 'No file uploaded' }, 400);
       }
 
-      const body = await c.req.json();
-      const { category, alt_text, description } = body;
+      // Use pre-parsed body from middleware if available
+      let body: any = getParsedBody(c);
+
+      if (!body) {
+        try {
+          body = await c.req.parseBody();
+        } catch (e) {
+          body = {};
+        }
+      }
+
+      const category = body.category as string;
+      const alt_text = body.alt_text as string;
+      const description = body.description as string;
 
       // Determine folder and resource type
       const folder = category ? getFolderForCategory(category) : 'general';
@@ -93,7 +105,7 @@ export class MediaController {
       }, 201);
     } catch (error) {
       console.error('Upload media error:', error);
-      return c.json({ error: 'Failed to upload media' }, 500);
+      return c.json({ error: 'Failed to upload media', details: (error as Error).message }, 500);
     }
   }
 
@@ -106,8 +118,19 @@ export class MediaController {
         return c.json({ error: 'No files uploaded' }, 400);
       }
 
-      const body = await c.req.json();
-      const { category, items } = body; // items can contain metadata for each file
+      // Use pre-parsed body from middleware if available
+      let body: any = getParsedBody(c);
+
+      if (!body) {
+        try {
+          body = await c.req.parseBody();
+        } catch (e) {
+          body = {};
+        }
+      }
+
+      const category = body.category as string;
+      const items = body.items; // items can contain metadata for each file
 
       const uploadPromises = files.map(async (file: { buffer: Buffer; mimetype: string }, index: number) => {
         const itemMeta = items?.[index] || {};
