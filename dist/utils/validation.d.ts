@@ -85,6 +85,7 @@ export declare const mediaSchema: z.ZodObject<{
         gallery: "gallery";
         receipt: "receipt";
         tip: "tip";
+        partner: "partner";
     }>>;
     alt_text: z.ZodOptional<z.ZodString>;
     description: z.ZodOptional<z.ZodString>;
@@ -93,6 +94,21 @@ export declare const mediaSchema: z.ZodObject<{
     width: z.ZodOptional<z.ZodNumber>;
     height: z.ZodOptional<z.ZodNumber>;
     duration: z.ZodOptional<z.ZodNumber>;
+}, z.core.$strip>;
+export declare const partnerSchema: z.ZodObject<{
+    name: z.ZodString;
+    description: z.ZodOptional<z.ZodString>;
+    category: z.ZodDefault<z.ZodEnum<{
+        Suppliers: "Suppliers";
+        Finance: "Finance";
+        Equipment: "Equipment";
+        Markets: "Markets";
+        Other: "Other";
+    }>>;
+    website_url: z.ZodPipe<z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodLiteral<"">]>>, z.ZodTransform<string | undefined, string | undefined>>;
+    logo_media_id: z.ZodPipe<z.ZodTransform<unknown, unknown>, z.ZodOptional<z.ZodString>>;
+    is_featured: z.ZodDefault<z.ZodBoolean>;
+    is_active: z.ZodDefault<z.ZodBoolean>;
 }, z.core.$strip>;
 export declare const availabilitySchema: z.ZodObject<{
     date: z.ZodString;

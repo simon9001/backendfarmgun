@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { supabase } from '../db/supabaseClient.js';
-import { CloudinaryService } from '../utils/cloudinary.js';
+// import { CloudinaryService } from '../utils/cloudinary.js';
 import { optimizeMedia, FeaturedMedia } from '../utils/media.js';
 
 export const publicRoutes = new Hono();

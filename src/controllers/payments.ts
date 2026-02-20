@@ -1,6 +1,6 @@
 import { Context } from 'hono';
 import { supabase } from '../db/supabaseClient.js';
-import { initializeTransaction, verifyTransaction, chargeMpesa } from '../utils/paystack.js';
+import {  verifyTransaction, chargeMpesa } from '../utils/paystack.js';
 
 import { sendEmail } from '../utils/resend.js';
 
@@ -78,7 +78,7 @@ export class PaymentsController {
       const { booking_id } = paystackData.data.metadata;
 
       // 1. Update payment record
-      const { data: payment, error: paymentError } = await supabase
+      const { error: paymentError } = await supabase
         .from('payments')
         .update({
           status: 'success',

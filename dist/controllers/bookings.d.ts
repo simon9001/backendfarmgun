@@ -21,7 +21,7 @@ export declare class BookingsController {
     }, 409, "json">) | (Response & import("hono").TypedResponse<{
         message: string;
         booking: any;
-        checkout_request_id: any;
+        payment_id: any;
     }, 201, "json">) | (Response & import("hono").TypedResponse<{
         error: any;
     }, 400, "json">)>;

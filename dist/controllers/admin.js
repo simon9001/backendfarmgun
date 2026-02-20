@@ -551,15 +551,13 @@ export class AdminController {
             }
             // Handle direct file upload if present
             const uploadedMediaId = await AdminController.uploadFileInternal(c, 'project');
-            let body = await c.req.parseBody();
-            // If it's JSON, parseBody might work or not depending on context. 
-            // But uploadMiddleware should have handled its part.
-            // If body is empty or doesn't have name, try json()
-            if (!body.name) {
-                try {
-                    body = await c.req.json();
-                }
-                catch (e) { }
+            let body;
+            const contentType = c.req.header('content-type') || '';
+            if (contentType.includes('application/json')) {
+                body = await c.req.json();
+            }
+            else {
+                body = await c.req.parseBody();
             }
             const validated = projectSchema.parse(body);
             const { media_ids, ...projectData } = validated;
@@ -623,12 +621,13 @@ export class AdminController {
             const id = c.req.param('id');
             // Handle direct file upload if present
             const uploadedMediaId = await AdminController.uploadFileInternal(c, 'project');
-            let body = await c.req.parseBody();
-            if (!body.name && !body.description && !body.status) {
-                try {
-                    body = await c.req.json();
-                }
-                catch (e) { }
+            let body;
+            const contentType = c.req.header('content-type') || '';
+            if (contentType.includes('application/json')) {
+                body = await c.req.json();
+            }
+            else {
+                body = await c.req.parseBody();
             }
             const validated = projectSchema.partial().parse(body);
             const { media_ids, ...projectData } = validated;

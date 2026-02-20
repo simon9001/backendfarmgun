@@ -1,36 +1,8 @@
 import { Hono } from 'hono';
 import { supabase } from '../db/supabaseClient.js';
-import { CloudinaryService } from '../utils/cloudinary.js';
+// import { CloudinaryService } from '../utils/cloudinary.js';
+import { optimizeMedia } from '../utils/media.js';
 export const publicRoutes = new Hono();
-// Media Optimization Helper
-const optimizeMedia = (media, options) => {
-    if (!media || !media.public_id)
-        return media;
-    const isCloudinary = media.url?.includes('res.cloudinary.com');
-    const isPlaceholder = ['hero-image', 'service-image', 'tip-image', 'crop-image', 'project-image'].includes(media.public_id);
-    if (isCloudinary && !isPlaceholder) {
-        // Extract version if present in URL
-        const versionMatch = media.url?.match(/\/v(\d+)\//);
-        const version = versionMatch ? versionMatch[1] : undefined;
-        return {
-            ...media,
-            optimized_url: CloudinaryService.getOptimizedImageUrl(media.public_id, {
-                ...options,
-                // @ts-ignore - version is supported by cloudinary.url but might not be in our basic wrapper
-                version,
-            }),
-            thumbnail_url: CloudinaryService.getOptimizedImageUrl(media.public_id, {
-                width: 200,
-                height: 150,
-                crop: 'fill',
-                quality: 60,
-                // @ts-ignore
-                version,
-            }),
-        };
-    }
-    return media;
-};
 // Services - Public
 publicRoutes.get('/services', async (c) => {
     const { featured, limit = '50', offset = '0' } = c.req.query();
@@ -344,6 +316,11 @@ publicRoutes.get('/projects', async (c) => {
         width,
         height
       ),
+      project_media:project_media(
+        id,
+        display_order,
+        media:media_library(*)
+      ),
       created_at
     `)
         .order('created_at', { ascending: false })
@@ -360,7 +337,7 @@ publicRoutes.get('/projects', async (c) => {
     const projectsWithOptimizedUrls = projects?.map(project => {
         const featuredMediaData = project.featured_media;
         const featuredMedia = (Array.isArray(featuredMediaData) ? featuredMediaData[0] : featuredMediaData);
-        return {
+        const optimizedProject = {
             ...project,
             featured_media: optimizeMedia(featuredMedia, {
                 width: 800,
@@ -369,6 +346,22 @@ publicRoutes.get('/projects', async (c) => {
                 quality: 85,
             })
         };
+        // Optimize gallery images
+        if (optimizedProject.project_media) {
+            optimizedProject.project_media = optimizedProject.project_media.map((item) => {
+                const itemMedia = (Array.isArray(item.media) ? item.media[0] : item.media);
+                return {
+                    ...item,
+                    media: optimizeMedia(itemMedia, {
+                        width: 800,
+                        height: 450,
+                        crop: 'fill',
+                        quality: 80,
+                    })
+                };
+            });
+        }
+        return optimizedProject;
     });
     return c.json({ projects: projectsWithOptimizedUrls || [] });
 });
@@ -1172,12 +1165,13 @@ publicRoutes.get('/homepage/hero', async (c) => {
 // Get stats for homepage
 publicRoutes.get('/stats', async (c) => {
     try {
-        const [servicesCount, projectsCount, testimonialsCount, tipsCount, bookingsCount] = await Promise.all([
+        const [servicesCount, projectsCount, testimonialsCount, tipsCount, bookingsCount, partnersCount] = await Promise.all([
             supabase.from('services').select('*', { count: 'exact', head: true }),
             supabase.from('projects').select('*', { count: 'exact', head: true }),
             supabase.from('testimonials').select('*', { count: 'exact', head: true }),
             supabase.from('tips').select('*', { count: 'exact', head: true }).eq('status', 'published'),
-            supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('status', 'completed')
+            supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
+            supabase.from('partners').select('*', { count: 'exact', head: true }).eq('is_active', true)
         ]);
         return c.json({
             stats: {
@@ -1186,6 +1180,7 @@ publicRoutes.get('/stats', async (c) => {
                 testimonials: testimonialsCount.count || 0,
                 tips: tipsCount.count || 0,
                 consultations_completed: bookingsCount.count || 0,
+                partners: partnersCount.count || 0,
             }
         });
     }

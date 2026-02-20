@@ -1,6 +1,5 @@
 import { supabase } from '../db/supabaseClient.js';
 import { bookingSchema } from '../utils/validation.js';
-import { MpesaService } from '../utils/mpesa.js';
 export class BookingsController {
     static async getAvailableSlots(c) {
         try {
@@ -85,7 +84,8 @@ export class BookingsController {
                 .select('id')
                 .eq('admin_id', adminId)
                 .eq('date', validated.date)
-                .or(`and(start_time.lte.${validated.start_time},end_time.gt.${validated.start_time}),and(start_time.lt.${endTime},end_time.gte.${endTime})`)
+                .lt('start_time', endTime)
+                .gt('end_time', validated.start_time)
                 .in('status', ['pending', 'paid', 'confirmed'])
                 .maybeSingle();
             if (conflictError)
@@ -93,24 +93,7 @@ export class BookingsController {
             if (conflictingBooking) {
                 return c.json({ error: 'Time slot is not available' }, 409);
             }
-            // 1. Initiate M-Pesa STK Push
-            let stkResponse;
-            try {
-                stkResponse = await MpesaService.initiateStkPush(validated.payment_phone, service.price, `BC-${Date.now()}`, `Consultation: ${service.name}`);
-            }
-            catch (mpesaError) {
-                const errorData = mpesaError.response?.data || mpesaError.message;
-                console.error('M-Pesa initiation failed:', errorData);
-                return c.json({
-                    error: 'Failed to initiate M-Pesa payment.',
-                    details: errorData,
-                    message: 'Please ensure your M-Pesa credentials in .env are correct and the phone number is valid.'
-                }, 400);
-            }
-            if (stkResponse.ResponseCode !== '0') {
-                return c.json({ error: 'M-Pesa rejected the request: ' + stkResponse.CustomerMessage }, 400);
-            }
-            // 2. Create booking (Pending Payment)
+            // 1. Create booking (Pending Payment)
             const { data: booking, error: bookingError } = await supabase
                 .from('bookings')
                 .insert({
@@ -121,7 +104,8 @@ export class BookingsController {
                 start_time: validated.start_time,
                 end_time: endTime,
                 status: 'pending',
-                user_notes: validated.user_notes
+                user_notes: validated.user_notes,
+                payment_phone: validated.payment_phone
             })
                 .select(`
           *,
@@ -131,21 +115,25 @@ export class BookingsController {
                 .single();
             if (bookingError) {
                 console.error('Supabase booking error:', bookingError);
-                return c.json({ error: 'Failed to create booking record after payment initiation.' }, 500);
+                return c.json({ error: 'Failed to create booking record.' }, 500);
             }
-            // 3. Create payment record with CheckoutRequestID
-            await supabase
+            // 2. Create payment record (initial state)
+            const { data: payment, error: paymentError } = await supabase
                 .from('payments')
                 .insert({
                 booking_id: booking.id,
                 amount: service.price,
-                status: 'pending',
-                transaction_id: stkResponse.CheckoutRequestID // Use this to track the callback
-            });
+                status: 'pending'
+            })
+                .select()
+                .single();
+            if (paymentError) {
+                console.error('Payment record creation error:', paymentError);
+            }
             return c.json({
-                message: 'STK Push sent successfully. Please enter your PIN on your phone to complete booking.',
+                message: 'Booking created. Proceed to payment.',
                 booking,
-                checkout_request_id: stkResponse.CheckoutRequestID
+                payment_id: payment?.id
             }, 201);
         }
         catch (error) {

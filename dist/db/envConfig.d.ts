@@ -10,10 +10,8 @@ export declare const env: {
     CLOUDINARY_CLOUD_NAME: string;
     CLOUDINARY_API_KEY: string;
     CLOUDINARY_API_SECRET: string;
-    DARAJA_CONSUMER_KEY: string;
-    DARAJA_CONSUMER_SECRET: string;
-    DARAJA_SHORTCODE: string;
-    DARAJA_PASSKEY: string;
+    PAYSTACK_SECRET_KEY: string;
+    RESEND_API_KEY: string;
 };
 export declare const validateEnv: () => boolean;
 //# sourceMappingURL=envConfig.d.ts.map

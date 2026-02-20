@@ -27,6 +27,10 @@ export const getResourceType = (mimeType) => {
 export const uploadSingle = (fieldName) => {
     return async (c, next) => {
         try {
+            const contentType = c.req.header('content-type') || '';
+            if (!contentType.includes('multipart/form-data') && !contentType.includes('application/x-www-form-urlencoded')) {
+                return await next();
+            }
             const body = await c.req.parseBody({ all: true });
             const file = body[fieldName];
             console.log(`[Upload] Single upload request for field: ${fieldName}`);
@@ -84,6 +88,10 @@ export const uploadSingle = (fieldName) => {
 export const uploadMultiple = (fieldName, maxCount = 10) => {
     return async (c, next) => {
         try {
+            const contentType = c.req.header('content-type') || '';
+            if (!contentType.includes('multipart/form-data') && !contentType.includes('application/x-www-form-urlencoded')) {
+                return await next();
+            }
             const body = await c.req.parseBody({ all: true });
             let files = body[fieldName];
             if (!files) {
