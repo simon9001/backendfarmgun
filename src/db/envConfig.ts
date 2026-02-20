@@ -25,8 +25,9 @@ if (result.error) {
 console.log("\n=== Current process.env ===");
 console.log("SUPABASE_URL:", process.env.SUPABASE_URL || "UNDEFINED");
 console.log("SUPABASE_SERVICE_KEY:", (process.env.SUPABASE_SERVICE_KEY || "UNDEFINED").substring(0, 10) + "...");
-console.log("DARAJA_KEY:", (process.env.DARAJA_CONSUMER_KEY || "UNDEFINED").substring(0, 5) + "...");
-console.log("DARAJA_SECRET:", (process.env.DARAJA_CONSUMER_SECRET || "UNDEFINED").substring(0, 5) + "...");
+console.log("PAYSTACK_KEY:", (process.env.PAYSTACK_SECRET_KEY || "UNDEFINED").substring(0, 5) + "...");
+console.log("RESEND_KEY:", (process.env.RESEND_API_KEY || "UNDEFINED").substring(0, 5) + "...");
+
 
 // Create env object with defaults
 export const env = {
@@ -41,11 +42,10 @@ export const env = {
   CLOUDINARY_CLOUD_NAME: (process.env.CLOUDINARY_CLOUD_NAME || "").trim(),
   CLOUDINARY_API_KEY: (process.env.CLOUDINARY_API_KEY || "").trim(),
   CLOUDINARY_API_SECRET: (process.env.CLOUDINARY_API_SECRET || "").trim(),
-  DARAJA_CONSUMER_KEY: (process.env.DARAJA_CONSUMER_KEY || "").trim(),
-  DARAJA_CONSUMER_SECRET: (process.env.DARAJA_CONSUMER_SECRET || "").trim(),
-  DARAJA_SHORTCODE: (process.env.DARAJA_SHORTCODE || "174379").trim(),
-  DARAJA_PASSKEY: (process.env.DARAJA_PASSKEY || "").trim(),
+  PAYSTACK_SECRET_KEY: (process.env.PAYSTACK_SECRET_KEY || "").trim(),
+  RESEND_API_KEY: (process.env.RESEND_API_KEY || "").trim(),
 };
+
 
 // Validation function
 export const validateEnv = () => {
@@ -55,10 +55,10 @@ export const validateEnv = () => {
     'SUPABASE_URL',
     'SUPABASE_SERVICE_KEY',
     'JWT_SECRET',
-    'DARAJA_CONSUMER_KEY',
-    'DARAJA_CONSUMER_SECRET',
-    'DARAJA_PASSKEY'
+    'PAYSTACK_SECRET_KEY',
+    'RESEND_API_KEY'
   ];
+
 
   for (const key of required) {
     if (!env[key as keyof typeof env]) {

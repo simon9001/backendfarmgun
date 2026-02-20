@@ -1,54 +1,12 @@
 import { Hono } from 'hono';
 import { supabase } from '../db/supabaseClient.js';
 import { CloudinaryService } from '../utils/cloudinary.js';
+import { optimizeMedia, FeaturedMedia } from '../utils/media.js';
 
 export const publicRoutes = new Hono();
 
-// Interfaces for type safety
-interface FeaturedMedia {
-  id: string;
-  public_id: string;
-  url: string;
-  type?: string;
-  alt_text?: string;
-  width?: number;
-  height?: number;
-  description?: string;
-  mime_type?: string;
-}
 
-// Media Optimization Helper
-const optimizeMedia = (media: FeaturedMedia | null, options: { width?: number; height?: number; quality?: number; crop?: string }) => {
-  if (!media || !media.public_id) return media;
 
-  const isCloudinary = media.url?.includes('res.cloudinary.com');
-  const isPlaceholder = ['hero-image', 'service-image', 'tip-image', 'crop-image', 'project-image'].includes(media.public_id);
-
-  if (isCloudinary && !isPlaceholder) {
-    // Extract version if present in URL
-    const versionMatch = media.url?.match(/\/v(\d+)\//);
-    const version = versionMatch ? versionMatch[1] : undefined;
-
-    return {
-      ...media,
-      optimized_url: CloudinaryService.getOptimizedImageUrl(media.public_id, {
-        ...options,
-        // @ts-ignore - version is supported by cloudinary.url but might not be in our basic wrapper
-        version,
-      }),
-      thumbnail_url: CloudinaryService.getOptimizedImageUrl(media.public_id, {
-        width: 200,
-        height: 150,
-        crop: 'fill',
-        quality: 60,
-        // @ts-ignore
-        version,
-      }),
-    };
-  }
-
-  return media;
-};
 
 // Services - Public
 publicRoutes.get('/services', async (c) => {
@@ -1346,13 +1304,15 @@ publicRoutes.get('/stats', async (c) => {
       projectsCount,
       testimonialsCount,
       tipsCount,
-      bookingsCount
+      bookingsCount,
+      partnersCount
     ] = await Promise.all([
       supabase.from('services').select('*', { count: 'exact', head: true }),
       supabase.from('projects').select('*', { count: 'exact', head: true }),
       supabase.from('testimonials').select('*', { count: 'exact', head: true }),
       supabase.from('tips').select('*', { count: 'exact', head: true }).eq('status', 'published'),
-      supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('status', 'completed')
+      supabase.from('bookings').select('*', { count: 'exact', head: true }).eq('status', 'completed'),
+      supabase.from('partners').select('*', { count: 'exact', head: true }).eq('is_active', true)
     ]);
 
     return c.json({
@@ -1362,8 +1322,10 @@ publicRoutes.get('/stats', async (c) => {
         testimonials: testimonialsCount.count || 0,
         tips: tipsCount.count || 0,
         consultations_completed: bookingsCount.count || 0,
+        partners: partnersCount.count || 0,
       }
     });
+
   } catch (error) {
     console.error('Stats fetch error:', error);
     return c.json({ error: 'Failed to fetch statistics' }, 500);

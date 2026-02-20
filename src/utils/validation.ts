@@ -36,8 +36,10 @@ export const bookingSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   start_time: z.string().regex(/^\d{2}:\d{2}$/),
   user_notes: z.string().optional(),
-  payment_phone: z.string().regex(/^(?:254|\+254|0)?(7|1)\d{8}$/, 'Invalid M-Pesa number'),
+  payment_phone: z.string().regex(/^(?:254|\+254|0)?(7|1)\d{8}$/, 'Invalid phone number'),
 });
+
+
 
 export const cropSchema = z.object({
   name: z.string().min(2).max(255),
@@ -81,7 +83,7 @@ export const mediaSchema = z.object({
   public_id: z.string().min(1),
   url: z.string().url(),
   type: z.enum(['image', 'video', 'document']),
-  category: z.enum(['homepage', 'project', 'crop', 'testimonial', 'profile', 'service', 'gallery', 'receipt', 'tip']).optional(),
+  category: z.enum(['homepage', 'project', 'crop', 'testimonial', 'profile', 'service', 'gallery', 'receipt', 'tip', 'partner']).optional(),
   alt_text: z.string().optional(),
   description: z.string().optional(),
   file_size: z.number().int().positive().optional(),
@@ -91,7 +93,18 @@ export const mediaSchema = z.object({
   duration: z.number().int().positive().optional(),
 });
 
+export const partnerSchema = z.object({
+  name: z.string().min(2).max(255),
+  description: z.string().optional(),
+  category: z.enum(['Suppliers', 'Finance', 'Equipment', 'Markets', 'Other']).default('Other'),
+  website_url: z.string().url().or(z.literal('')).optional().transform(v => v === '' ? undefined : v),
+  logo_media_id: optionalUuid,
+  is_featured: z.boolean().default(false),
+  is_active: z.boolean().default(true),
+});
+
 export const availabilitySchema = z.object({
+
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   start_time: z.string().regex(/^\d{2}:\d{2}$/),
   end_time: z.string().regex(/^\d{2}:\d{2}$/),

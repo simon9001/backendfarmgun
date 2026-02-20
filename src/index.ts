@@ -10,7 +10,9 @@ import { notificationRoutes } from './routes/notifications.js';
 import { adminRoutes } from './routes/admin.js';
 import { publicRoutes } from './routes/public.js';
 import { mediaRoutes } from './routes/media.js';
+import { partnerRoutes } from './routes/partners.js';
 import { extractUser } from './middleware/authMiddleware.js';
+
 import { env } from './db/envConfig.js';
 
 const app = new Hono();
@@ -25,7 +27,7 @@ app.use('*', extractUser);
 
 // === HEALTH CHECK ===
 app.get('/', (c) => {
-  return c.json({ 
+  return c.json({
     message: 'Agriculture Consultation Platform API',
     version: '1.0.0',
     status: 'healthy',
@@ -42,7 +44,11 @@ app.route('/api/auth', authRoutes);
 // === MEDIA ROUTES ===
 app.route('/api/media', mediaRoutes);
 
+// === PARTNER ROUTES ===
+app.route('/api/partners', partnerRoutes);
+
 // === PROTECTED ROUTES ===
+
 app.route('/api/services', serviceRoutes);
 app.route('/api/bookings', bookingRoutes);
 app.route('/api/payments', paymentRoutes);
@@ -51,14 +57,21 @@ app.route('/api/notifications', notificationRoutes);
 // === ADMIN ROUTES ===
 app.route('/api/admin', adminRoutes);
 
+import { HTTPException } from 'hono/http-exception';
+
 // === ERROR HANDLING ===
 app.onError((err, c) => {
+  if (err instanceof HTTPException) {
+    return err.getResponse();
+  }
+
   console.error('Unhandled error:', err);
   return c.json({
     error: 'Internal server error',
     message: env.NODE_ENV === 'development' ? err.message : undefined
   }, 500);
 });
+
 
 app.notFound((c) => {
   return c.json({ error: 'Endpoint not found' }, 404);

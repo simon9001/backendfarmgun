@@ -8,8 +8,10 @@ CREATE TYPE payment_status AS ENUM ('pending','success','failed');
 CREATE TYPE notification_type AS ENUM ('booking_confirmation','reminder','payment_receipt');
 CREATE TYPE media_type AS ENUM ('image','video','document');
 CREATE TYPE media_category AS ENUM (
-  'homepage','project','crop','testimonial','profile','service','gallery','receipt','tip'
+  'homepage','project','crop','testimonial','profile','service','gallery','receipt','tip','partner'
 );
+CREATE TYPE partner_category AS ENUM ('Suppliers', 'Finance', 'Equipment', 'Markets', 'Other');
+
 CREATE TYPE tip_status AS ENUM ('draft','published','archived');
 
 
@@ -20,8 +22,12 @@ CREATE TABLE users (
     email VARCHAR(255) UNIQUE,
     password_hash VARCHAR(255),
     role user_role NOT NULL DEFAULT 'client',
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    reset_token VARCHAR(255),
+    reset_token_expires TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+
+
 );
 
 CREATE TABLE media_library (
@@ -38,8 +44,9 @@ CREATE TABLE media_library (
     height INT,
     duration INT,
     uploaded_by UUID REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+
 );
 
 ALTER TABLE users
@@ -53,8 +60,9 @@ CREATE TABLE services (
     duration_mins INT NOT NULL,
     price DECIMAL(10,2) NOT NULL,
     featured_media_id UUID REFERENCES media_library(id),
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+
 );
 
 
@@ -73,6 +81,17 @@ CREATE TABLE service_crops (
     crop_id UUID REFERENCES crops(id) ON DELETE CASCADE,
     PRIMARY KEY (service_id, crop_id)
 );
+
+
+CREATE TABLE crop_media (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    crop_id UUID REFERENCES crops(id) ON DELETE CASCADE,
+    media_id UUID REFERENCES media_library(id) ON DELETE CASCADE,
+    caption TEXT,
+    display_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
 
 
 CREATE TABLE projects (
@@ -117,7 +136,11 @@ CREATE TABLE bookings (
     start_time TIME NOT NULL,
     end_time TIME NOT NULL,
     status booking_status NOT NULL DEFAULT 'pending',
+    user_notes TEXT,
+    payment_phone VARCHAR(20),
     meeting_link VARCHAR(500),
+
+
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -156,9 +179,10 @@ CREATE TABLE tips (
     featured_media_id UUID REFERENCES media_library(id),
     author_id UUID REFERENCES users(id),
     status tip_status DEFAULT 'draft',
-    published_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    published_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+
 );
 
 
@@ -170,6 +194,27 @@ CREATE TABLE tip_media (
     display_order INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT NOW()
 );
+CREATE TABLE partners (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    category partner_category NOT NULL DEFAULT 'Other',
+    website_url VARCHAR(500),
+    logo_media_id UUID REFERENCES media_library(id),
+    is_featured BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_partners_updated_at
+BEFORE UPDATE ON partners
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE INDEX idx_partners_active ON partners(is_active);
+CREATE INDEX idx_partners_featured ON partners(is_featured);
+CREATE INDEX idx_partners_category ON partners(category);
+
 
 
 
@@ -398,7 +443,67 @@ VALUES (
 );
 
 
+
+-- Partners Logo Media
+INSERT INTO media_library (
+  id, public_id, url, type, category, alt_text, uploaded_by
+)
+VALUES
+(
+  uuid_generate_v4(),
+  'partner-logo-1',
+  'https://images.unsplash.com/photo-1594818378822-4193327f912e?auto=format&fit=crop&w=200&h=200',
+  'image',
+  'partner',
+  'AgriBank Logo',
+  (SELECT id FROM users WHERE role='admin' LIMIT 1)
+),
+(
+  uuid_generate_v4(),
+  'partner-logo-2',
+  'https://images.unsplash.com/photo-1589156229687-496a31ad1d1f?auto=format&fit=crop&w=200&h=200',
+  'image',
+  'partner',
+  'Fertilizer Co Logo',
+  (SELECT id FROM users WHERE role='admin' LIMIT 1)
+);
+
+-- Partners Seed Data
+INSERT INTO partners (
+  name, description, category, website_url, logo_media_id, is_featured, is_active
+)
+VALUES
+(
+  'AgriBank Kenya',
+  'Providing tailored financial solutions and loans for small-scale farmers to scale their operations.',
+  'Finance',
+  'https://example.com/agribank',
+  (SELECT id FROM media_library WHERE public_id='partner-logo-1' LIMIT 1),
+  true,
+  true
+),
+(
+  'GreenGrow Supplies',
+  'Your one-stop shop for high-quality certified seeds, organic fertilizers, and modern irrigation tools.',
+  'Suppliers',
+  'https://example.com/greengrow',
+  (SELECT id FROM media_library WHERE public_id='partner-logo-2' LIMIT 1),
+  true,
+  true
+),
+(
+  'Modern Tractors Ltd',
+  'Heavy machinery leasing and maintenance services specifically designed for commercial farming projects.',
+  'Equipment',
+  'https://example.com/tractors',
+  NULL,
+  false,
+  true
+);
+
+
 select * from users
+
 
 
 UPDATE users
