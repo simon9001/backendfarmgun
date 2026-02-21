@@ -4,12 +4,17 @@ import { env } from '../db/envConfig.js';
 const RESEND_API_KEY = env.RESEND_API_KEY;
 
 
-export const sendEmail = async (to: string, subject: string, html: string) => {
+export const sendEmail = async (
+    to: string,
+    subject: string,
+    html: string,
+    from: string = 'Farm with Irene <no-reply@farmwithirene.online>'
+) => {
     try {
         const response = await axios.post(
             'https://api.resend.com/emails',
             {
-                from: 'Farm with Irene <no-reply@farmwithirene.online>', // Default for test accounts
+                from,
                 to: [to],
                 subject,
                 html,
