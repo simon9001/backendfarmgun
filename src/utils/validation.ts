@@ -113,9 +113,19 @@ export const partnerSchema = z.object({
 });
 
 export const availabilitySchema = z.object({
-
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   start_time: z.string().regex(/^\d{2}:\d{2}$/),
   end_time: z.string().regex(/^\d{2}:\d{2}$/),
   is_available: z.boolean().default(true),
+});
+
+export const partnerInterestSchema = z.object({
+  company_name: z.string().min(2).max(255),
+  contact_person: z.string().min(2).max(255),
+  email: z.string().email(),
+  phone: z.string().min(10).max(20),
+  partnership_type: z.enum(['sponsorship', 'co-branding', 'equipment', 'funding', 'mentorship', 'other']),
+  budget_resources: z.string().min(5),
+  interest_reason: z.string().min(10),
+  status: z.enum(['pending', 'reviewed', 'proposal_requested', 'evaluated', 'negotiating', 'approved', 'declined']).default('pending'),
 });

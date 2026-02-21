@@ -1,6 +1,6 @@
 import { Context } from 'hono';
 import { supabase } from '../db/supabaseClient.js';
-import { partnerSchema } from '../utils/validation.js';
+import { partnerSchema, partnerInterestSchema } from '../utils/validation.js';
 import { optimizeMedia } from '../utils/media.js';
 
 
@@ -184,6 +184,33 @@ export class PartnersController {
         } catch (error) {
             console.error('Delete partner error:', error);
             return c.json({ error: 'Failed to delete partner' }, 500);
+        }
+    }
+
+    // Public: EOI Submission
+    static async submitInterest(c: Context) {
+        try {
+            const body = await c.req.json();
+            const validated = partnerInterestSchema.parse(body);
+
+            const { data, error } = await supabase
+                .from('partner_interests')
+                .insert(validated)
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            return c.json({
+                message: 'Your interest has been submitted successfully. Our team will review it and get back to you.',
+                data
+            }, 201);
+        } catch (error: any) {
+            console.error('Submit partner interest error:', error);
+            if (error.name === 'ZodError') {
+                return c.json({ error: 'Validation failed', details: error.errors }, 400);
+            }
+            return c.json({ error: error.message || 'Failed to submit interest' }, 400);
         }
     }
 }
