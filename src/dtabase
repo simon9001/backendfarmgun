@@ -56,13 +56,15 @@ ADD COLUMN profile_media_id UUID REFERENCES media_library(id);
 CREATE TABLE services (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
+    tagline TEXT,
     description TEXT,
-    duration_mins INT NOT NULL,
-    price DECIMAL(10,2) NOT NULL,
+    what_get JSONB,
+    pricing_options JSONB,
+    duration_mins INT NOT NULL DEFAULT 60,
+    price DECIMAL(10,2) NOT NULL DEFAULT 0,
     featured_media_id UUID REFERENCES media_library(id),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
-
 );
 
 
@@ -321,14 +323,62 @@ VALUES
 
 
 INSERT INTO services (
-  id, name, description, duration_mins, price, featured_media_id
+  id, name, tagline, description, what_get, pricing_options, duration_mins, price, featured_media_id
 )
-VALUES (
+VALUES 
+(
   uuid_generate_v4(),
-  'Crop Consultation',
-  'Professional crop advisory service',
+  'Farm Startup Consultation',
+  'Start Right. Avoid Costly Mistakes.',
+  'This service is designed for individuals who want to venture into farming but need proper direction before investing. I will guide you through crop selection, land suitability, budgeting, and expected returns to help you make informed decisions.',
+  '["60-minute one-on-one consultation (phone or Zoom)", "Crop suitability advice based on your location", "Estimated startup cost breakdown", "Basic production timeline", "Profitability guidance"]',
+  '[{"label": "Virtual", "price": 5000, "currency": "KES"}, {"label": "Physical visit within county", "price": 10000, "currency": "KES", "note": "transport separate"}]',
   60,
-  2500.00,
+  5000.00,
+  (SELECT id FROM media_library WHERE category='service' LIMIT 1)
+),
+(
+  uuid_generate_v4(),
+  'Onion Commercial Production Plan (Signature Service 👑)',
+  'A Complete Step-by-Step Onion Farming Blueprint',
+  'This is a structured production plan tailored to your land size and budget — ideal for serious farmers who want to farm onions commercially.',
+  '["Recommended onion variety", "Seed rate calculation", "Nursery management guide", "Transplanting plan", "Fertilizer & spray schedule", "Irrigation schedule", "Pest & disease control strategy", "Yield projection", "Market timing advice", "Delivered as a written PDF plan + 45-minute explanation call"]',
+  '[{"label": "Up to 1 Acre", "price": 15000, "currency": "KES"}, {"label": "1–5 Acres", "price": 25000, "currency": "KES"}, {"label": "Above 5 Acres", "is_custom": true, "note": "Custom Quote"}]',
+  45,
+  15000.00,
+  (SELECT id FROM media_library WHERE category='service' LIMIT 1)
+),
+(
+  uuid_generate_v4(),
+  'Irrigation Design & Supervision',
+  'Efficient Water = Higher Yields',
+  'Proper irrigation planning increases productivity and reduces water wastage. I help you design and supervise drip irrigation installation for maximum efficiency.',
+  '["Water source assessment", "Farm layout planning", "Drip spacing recommendations", "Installation supervision", "Fertigation guidance"]',
+  '[{"label": "Planning Only", "price": 20000, "currency": "KES", "note": "per acre"}, {"label": "Planning + On-site Supervision", "price": 35000, "currency": "KES", "note": "From KES 35,000 per acre (Installation materials not included)"}]',
+  60,
+  20000.00,
+  (SELECT id FROM media_library WHERE category='service' LIMIT 1)
+),
+(
+  uuid_generate_v4(),
+  'Farm Mentorship Program (Premium Support)',
+  'Walk With Me Throughout Your Farming Season',
+  'This is ongoing support for farmers who want consistent expert guidance.',
+  '["Monthly check-ins", "Spray & fertilizer adjustments", "Disease diagnosis support (via photos/videos)", "Market timing advice", "WhatsApp priority access"]',
+  '[{"label": "3 Months", "price": 20000, "currency": "KES"}, {"label": "Full Season (5–6 months)", "price": 35000, "currency": "KES"}]',
+  60,
+  20000.00,
+  (SELECT id FROM media_library WHERE category='service' LIMIT 1)
+),
+(
+  uuid_generate_v4(),
+  'On-Site Farm Visit & Assessment',
+  'Professional Field Evaluation',
+  'Ideal for farmers experiencing challenges or planning to scale.',
+  '["Full farm assessment", "Soil & crop condition evaluation", "Pest & disease diagnosis", "Improvement recommendations", "Written summary report"]',
+  '[{"label": "Within county", "price": 15000, "currency": "KES"}, {"label": "Outside county", "is_custom": true, "note": "Custom quote + transport"}]',
+  120,
+  15000.00,
   (SELECT id FROM media_library WHERE category='service' LIMIT 1)
 );
 

@@ -22,6 +22,15 @@ export interface Service {
   id: string;
   name: string;
   description?: string;
+  tagline?: string;
+  what_get?: string[];
+  pricing_options?: {
+    label: string;
+    price?: number;
+    currency: string;
+    note?: string;
+    is_custom: boolean;
+  }[];
   duration_mins: number;
   price: number;
   featured_media_id?: string;
@@ -128,28 +137,28 @@ export interface AuthTokenPayload {
   userId: string;
   role: UserRole;
   email?: string;
-  phone?: string; 
+  phone?: string;
 }
 export interface CloudinaryUploadResult {
-    public_id: string;
-    url: string;
-    secure_url: string;
-    format: string;
-    resource_type: string;
-    bytes: number;
-    width?: number;
-    height?: number;
-    duration?: number;
-    created_at?: string;
-    tags?: string[];
-    folder?: string;
-  }
-  
-  export interface MediaUploadResponse {
-    media: Media;
-    cloudinary_info?: CloudinaryUploadResult;
-  }
-  
-  export interface MediaWithCloudinaryInfo extends Media {
-    cloudinary_info?: CloudinaryUploadResult;
-  }
+  public_id: string;
+  url: string;
+  secure_url: string;
+  format: string;
+  resource_type: string;
+  bytes: number;
+  width?: number;
+  height?: number;
+  duration?: number;
+  created_at?: string;
+  tags?: string[];
+  folder?: string;
+}
+
+export interface MediaUploadResponse {
+  media: Media;
+  cloudinary_info?: CloudinaryUploadResult;
+}
+
+export interface MediaWithCloudinaryInfo extends Media {
+  cloudinary_info?: CloudinaryUploadResult;
+}

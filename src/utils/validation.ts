@@ -25,6 +25,15 @@ const optionalUuid = z.preprocess(
 export const serviceSchema = z.object({
   name: z.string().min(2).max(255),
   description: z.string().optional(),
+  tagline: z.string().optional(),
+  what_get: z.array(z.string()).optional(),
+  pricing_options: z.array(z.object({
+    label: z.string(),
+    price: z.number().optional(),
+    currency: z.string().default('KES'),
+    note: z.string().optional(),
+    is_custom: z.boolean().default(false)
+  })).optional(),
   duration_mins: z.number().int().positive(),
   price: z.number().positive(),
   featured_media_id: optionalUuid,
