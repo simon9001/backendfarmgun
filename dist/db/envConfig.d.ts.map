@@ -1,1 +1,1 @@
-{"version":3,"file":"envConfig.d.ts","sourceRoot":"","sources":["../../src/db/envConfig.ts"],"names":[],"mappings":"AAgCA,eAAO,MAAM,GAAG;;;;;;;;;;;;;;CAcf,CAAC;AAIF,eAAO,MAAM,WAAW,eAwBvB,CAAC"}
+{"version":3,"file":"envConfig.d.ts","sourceRoot":"","sources":["../../src/db/envConfig.ts"],"names":[],"mappings":"AAgCA,eAAO,MAAM,GAAG;;;;;;;;;;;;;;;;;;CAkBf,CAAC;AAIF,eAAO,MAAM,WAAW,eAmCvB,CAAC"}

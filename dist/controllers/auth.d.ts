@@ -49,5 +49,8 @@ export declare class AuthController {
     }, import("hono/utils/http-status").ContentfulStatusCode, "json">) | (Response & import("hono").TypedResponse<{
         error: string;
     }, 500, "json">)>;
+    static logout(c: Context): Promise<Response & import("hono").TypedResponse<{
+        message: string;
+    }, import("hono/utils/http-status").ContentfulStatusCode, "json">>;
 }
 //# sourceMappingURL=auth.d.ts.map

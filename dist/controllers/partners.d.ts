@@ -34,5 +34,11 @@ export declare class PartnersController {
     }, import("hono/utils/http-status").ContentfulStatusCode, "json">) | (Response & import("hono").TypedResponse<{
         error: string;
     }, 500, "json">)>;
+    static submitInterest(c: Context): Promise<(Response & import("hono").TypedResponse<{
+        message: string;
+        data: any;
+    }, 201, "json">) | (Response & import("hono").TypedResponse<{
+        error: any;
+    }, 400, "json">)>;
 }
 //# sourceMappingURL=partners.d.ts.map

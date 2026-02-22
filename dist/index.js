@@ -13,7 +13,23 @@ import { mediaRoutes } from './routes/media.js';
 import { partnerRoutes } from './routes/partners.js';
 import { extractUser } from './middleware/authMiddleware.js';
 import { env } from './db/envConfig.js';
+import { rateLimit } from 'hono-rate-limit';
 const app = new Hono();
+// === RATE LIMITING ===
+// Strict limiter for auth endpoints (5 requests per min)
+const authLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 5,
+    keyGenerator: (c) => c.req.header('x-forwarded-for') || c.req.header('remote-addr') || 'anonymous',
+    message: { error: 'Too many authentication attempts. Please try again later.' },
+});
+// General limiter for other API endpoints (100 requests per min)
+const generalLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 100,
+    keyGenerator: (c) => c.req.header('x-forwarded-for') || c.req.header('remote-addr') || 'anonymous',
+    message: { error: 'Too many requests. Please slow down.' },
+});
 // === MIDDLEWARE ===
 app.use('*', logger());
 app.use('*', cors({
@@ -33,7 +49,13 @@ app.get('/', (c) => {
 // === PUBLIC ROUTES ===
 app.route('/api/public', publicRoutes);
 // === AUTH ROUTES ===
+// Apply strict limiting to login and register
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 app.route('/api/auth', authRoutes);
+// === PROTECTED & OTHER ROUTES ===
+// Apply general limiting
+app.use('/api/*', generalLimiter);
 // === MEDIA ROUTES ===
 app.route('/api/media', mediaRoutes);
 // === PARTNER ROUTES ===

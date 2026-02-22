@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { supabase } from '../db/supabaseClient.js';
 // import { CloudinaryService } from '../utils/cloudinary.js';
 import { optimizeMedia } from '../utils/media.js';
+import { AdminController } from '../controllers/admin.js';
+import { authMiddleware } from '../middleware/authMiddleware.js';
 export const publicRoutes = new Hono();
 // Services - Public
 publicRoutes.get('/services', async (c) => {
@@ -516,6 +518,7 @@ publicRoutes.get('/testimonials', async (c) => {
     });
     return c.json({ testimonials: testimonialsWithOptimizedUrls || [] });
 });
+publicRoutes.post('/testimonials', authMiddleware, AdminController.createTestimonial);
 // Tips/Blog Posts - Public
 publicRoutes.get('/tips', async (c) => {
     const { featured, limit = '10', offset = '0', search } = c.req.query();

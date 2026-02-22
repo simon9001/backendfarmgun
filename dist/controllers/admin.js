@@ -790,6 +790,23 @@ export class AdminController {
             const user = c.get('user');
             const body = await c.req.json();
             const validated = testimonialSchema.parse(body);
+            // Restriction: Only users with completed bookings can leave reviews
+            if (user.role === 'client') {
+                const { data: completedBookings, error: bookingError } = await supabase
+                    .from('bookings')
+                    .select('id')
+                    .eq('user_id', user.userId)
+                    .eq('status', 'completed')
+                    .limit(1);
+                if (bookingError)
+                    throw bookingError;
+                if (!completedBookings || completedBookings.length === 0) {
+                    return c.json({
+                        error: 'Access Denied',
+                        message: 'Only users who have completed a session with us can leave a review. Please book a session and complete it first.'
+                    }, 403);
+                }
+            }
             const { data: testimonial, error } = await supabase
                 .from('testimonials')
                 .insert({

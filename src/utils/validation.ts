@@ -46,6 +46,7 @@ export const bookingSchema = z.object({
   start_time: z.string().regex(/^\d{2}:\d{2}$/),
   user_notes: z.string().optional(),
   payment_phone: z.string().regex(/^(?:254|\+254|0)?(7|1)\d{8}$/, 'Invalid phone number'),
+  pricing_option: z.string().optional(),
 });
 
 
@@ -78,6 +79,16 @@ export const testimonialSchema = z.object({
   user_media_id: optionalUuid,
 });
 
+export const blogSchema = z.object({
+  title: z.string().min(2).max(255),
+  slug: z.string().min(2).max(255).regex(/^[a-z0-9-]+$/),
+  content: z.string().min(10),
+  excerpt: z.string().optional(),
+  featured_media_id: optionalUuid,
+  status: z.enum(['draft', 'published', 'archived']).default('draft'),
+  published_at: z.string().datetime().nullable().optional(),
+});
+
 export const tipSchema = z.object({
   title: z.string().min(2).max(255),
   slug: z.string().min(2).max(255).regex(/^[a-z0-9-]+$/),
@@ -92,7 +103,7 @@ export const mediaSchema = z.object({
   public_id: z.string().min(1),
   url: z.string().url(),
   type: z.enum(['image', 'video', 'document']),
-  category: z.enum(['homepage', 'project', 'crop', 'testimonial', 'profile', 'service', 'gallery', 'receipt', 'tip', 'partner']).optional(),
+  category: z.enum(['homepage', 'project', 'crop', 'testimonial', 'profile', 'service', 'gallery', 'receipt', 'tip', 'partner', 'blog']).optional(),
   alt_text: z.string().optional(),
   description: z.string().optional(),
   file_size: z.number().int().positive().optional(),

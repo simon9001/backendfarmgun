@@ -87,6 +87,11 @@ serve({
   console.log(`🚀 Server is running on http://localhost:${info.port}`);
   console.log(`📁 Environment: ${env.NODE_ENV}`);
   console.log(`🌐 CORS Origin: ${env.CORS_ORIGIN}`);
+
+  // Start background jobs
+  import('./utils/cleanupJob.js').then(({ startCleanupJob }) => {
+    startCleanupJob();
+  });
 });
 
 // === GRACEFUL SHUTDOWN ===

@@ -126,9 +126,9 @@ export class BookingsController {
           end_time: endTime,
           status: 'pending',
           user_notes: validated.user_notes,
-          payment_phone: validated.payment_phone
+          payment_phone: validated.payment_phone,
+          pricing_option: validated.pricing_option
         })
-
         .select(`
           *,
           service:services(*),
@@ -141,12 +141,21 @@ export class BookingsController {
         return c.json({ error: 'Failed to create booking record.' }, 500);
       }
 
+      // Determine price from pricing option
+      let finalPrice = service.price;
+      if (validated.pricing_option && booking.service.pricing_options) {
+        const option = booking.service.pricing_options.find((opt: any) => opt.label === validated.pricing_option);
+        if (option && !option.is_custom && typeof option.price === 'number') {
+          finalPrice = option.price;
+        }
+      }
+
       // 2. Create payment record (initial state)
       const { data: payment, error: paymentError } = await supabase
         .from('payments')
         .insert({
           booking_id: booking.id,
-          amount: service.price,
+          amount: finalPrice,
           status: 'pending'
         })
         .select()

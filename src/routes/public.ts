@@ -27,7 +27,10 @@ publicRoutes.get('/services', async (c) => {
     .select(`
       id,
       name,
+      tagline,
       description,
+      what_get,
+      pricing_options,
       duration_mins,
       price,
       featured_media:media_library(
@@ -835,6 +838,124 @@ publicRoutes.get('/tips/:slug/related', async (c) => {
   });
 
   return c.json({ related_tips: tipsWithOptimizedUrls || [] });
+});
+
+// Blogs - Public
+publicRoutes.get('/blogs', async (c) => {
+  const { category, featured, limit = '24', offset = '0' } = c.req.query();
+
+  const limitNum = parseInt(limit, 10);
+  const offsetNum = parseInt(offset, 10);
+
+  let query = supabase
+    .from('blogs')
+    .select(`
+    *,
+    featured_media:media_library(*),
+    author:users(name)
+  `, { count: 'exact' })
+    .eq('status', 'published')
+    .order('published_at', { ascending: false })
+    .range(offsetNum, offsetNum + limitNum - 1);
+
+  if (category) {
+    query = query.eq('category', category);
+  }
+
+  if (featured === 'true') {
+    query = query.limit(3);
+  }
+
+  const { data: blogs, error, count } = await query;
+
+  if (error) {
+    console.error('Blogs fetch error:', error);
+    return c.json({ error: 'Failed to fetch blogs' }, 500);
+  }
+
+  const blogsWithOptimizedUrls = blogs?.map(blog => {
+    return {
+      ...blog,
+      featured_media: optimizeMedia(blog.featured_media as any, {
+        width: 800,
+        height: 600,
+        quality: 80,
+      })
+    };
+  });
+
+  return c.json({
+    blogs: blogsWithOptimizedUrls || [],
+    meta: { count: count || 0, limit: limitNum, offset: offsetNum }
+  });
+});
+
+publicRoutes.get('/blogs/:slug', async (c) => {
+  const slug = c.req.param('slug');
+
+  const { data: blog, error } = await supabase
+    .from('blogs')
+    .select(`
+    *,
+    featured_media:media_library(*),
+    author:users(name, role, profile_media:media_library(*)),
+    blog_media:blog_media(
+      media:media_library(*)
+    )
+  `)
+    .eq('slug', slug)
+    .eq('status', 'published')
+    .single();
+
+  if (error || !blog) {
+    return c.json({ error: 'Blog not found' }, 404);
+  }
+
+  return c.json({
+    blog: {
+      ...blog,
+      featured_media: optimizeMedia(blog.featured_media as any, { quality: 90 })
+    }
+  });
+});
+
+publicRoutes.get('/blogs/:slug/related', async (c) => {
+  const slug = c.req.param('slug');
+
+  const { data: currentBlog } = await supabase
+    .from('blogs')
+    .select('id, category')
+    .eq('slug', slug)
+    .single();
+
+  if (!currentBlog) return c.json({ related_blogs: [] });
+
+  const { data: blogs, error } = await supabase
+    .from('blogs')
+    .select(`
+    *,
+    featured_media:media_library(*),
+    author:users(name)
+  `)
+    .eq('status', 'published')
+    .eq('category', currentBlog.category)
+    .neq('id', currentBlog.id)
+    .limit(3);
+
+  if (error) {
+    return c.json({ error: 'Failed to fetch related blogs' }, 500);
+  }
+
+  const blogsWithOptimizedUrls = blogs?.map(blog => ({
+    ...blog,
+    featured_media: optimizeMedia(blog.featured_media as any, {
+      width: 400,
+      height: 300,
+      quality: 70
+    })
+  }));
+
+  return c.json({ related_blogs: blogsWithOptimizedUrls || [] });
 });
 
 // Landing Page Data - Combined endpoint for homepage

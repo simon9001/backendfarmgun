@@ -18,6 +18,15 @@ const optionalUuid = z.preprocess((val) => (val === '' ? undefined : val), z.str
 export const serviceSchema = z.object({
     name: z.string().min(2).max(255),
     description: z.string().optional(),
+    tagline: z.string().optional(),
+    what_get: z.array(z.string()).optional(),
+    pricing_options: z.array(z.object({
+        label: z.string(),
+        price: z.number().optional(),
+        currency: z.string().default('KES'),
+        note: z.string().optional(),
+        is_custom: z.boolean().default(false)
+    })).optional(),
     duration_mins: z.number().int().positive(),
     price: z.number().positive(),
     featured_media_id: optionalUuid,
@@ -91,5 +100,15 @@ export const availabilitySchema = z.object({
     start_time: z.string().regex(/^\d{2}:\d{2}$/),
     end_time: z.string().regex(/^\d{2}:\d{2}$/),
     is_available: z.boolean().default(true),
+});
+export const partnerInterestSchema = z.object({
+    company_name: z.string().min(2).max(255),
+    contact_person: z.string().min(2).max(255),
+    email: z.string().email(),
+    phone: z.string().min(10).max(20),
+    partnership_type: z.enum(['sponsorship', 'co-branding', 'equipment', 'funding', 'mentorship', 'other']),
+    budget_resources: z.string().min(5),
+    interest_reason: z.string().min(10),
+    status: z.enum(['pending', 'reviewed', 'proposal_requested', 'evaluated', 'negotiating', 'approved', 'declined']).default('pending'),
 });
 //# sourceMappingURL=validation.js.map

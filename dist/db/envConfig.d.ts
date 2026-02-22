@@ -12,6 +12,10 @@ export declare const env: {
     CLOUDINARY_API_SECRET: string;
     PAYSTACK_SECRET_KEY: string;
     RESEND_API_KEY: string;
+    GOOGLE_CLIENT_EMAIL: string;
+    GOOGLE_PRIVATE_KEY: string;
+    GOOGLE_CALENDAR_ID: string;
+    RESEND_FROM_EMAIL: string;
 };
 export declare const validateEnv: () => boolean;
 //# sourceMappingURL=envConfig.d.ts.map

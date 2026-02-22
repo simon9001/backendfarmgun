@@ -8,7 +8,7 @@ export const sendEmail = async (
     to: string,
     subject: string,
     html: string,
-    from: string = 'Farm with Irene <no-reply@farmwithirene.online>'
+    from: string = 'Farm with Irene <confirmation@farmwithirene.online>'
 ) => {
     try {
         const response = await axios.post(

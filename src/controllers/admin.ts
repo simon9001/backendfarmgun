@@ -4,6 +4,7 @@ import {
   projectSchema,
   testimonialSchema,
   tipSchema,
+  blogSchema,
   serviceSchema,
   cropSchema,
   availabilitySchema
@@ -1213,6 +1214,33 @@ export class AdminController {
     }
   }
 
+  static async getAllTips(c: Context) {
+    try {
+      const user = c.get('user');
+      if (user.role !== 'admin') {
+        return c.json({ error: 'Admin access required' }, 403);
+      }
+
+      const { data: tips, error } = await supabase
+        .from('tips')
+        .select(`
+          *,
+          author:users(name),
+          tip_media:tip_media(
+            media:media_library(*)
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return c.json({ tips });
+    } catch (error) {
+      console.error('Get all tips error:', error);
+      return c.json({ error: 'Failed to fetch tips' }, 500);
+    }
+  }
+
   static async addTipMedia(c: Context) {
     try {
       const user = c.get('user');
@@ -1243,6 +1271,193 @@ export class AdminController {
     } catch (error) {
       console.error('Add tip media error:', error);
       return c.json({ error: 'Failed to add media to tip' }, 400);
+    }
+  }
+
+  // ==================== BLOG MANAGEMENT ====================
+  static async createBlog(c: Context) {
+    try {
+      const user = c.get('user');
+      if (user.role !== 'admin') {
+        return c.json({ error: 'Admin access required' }, 403);
+      }
+
+      const body = await c.req.json();
+      const validated = blogSchema.parse(body);
+
+      const { data: blog, error } = await supabase
+        .from('blogs')
+        .insert({
+          ...validated,
+          author_id: user.userId,
+          published_at: validated.status === 'published' ? new Date().toISOString() : null,
+        })
+        .select(`
+          *,
+          featured_media:media_library(*),
+          author:users(name),
+          blog_media:blog_media(
+            media:media_library(*)
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+
+      return c.json({ blog }, 201);
+    } catch (error) {
+      console.error('Create blog error:', error);
+      return c.json({ error: 'Failed to create blog' }, 400);
+    }
+  }
+
+  static async updateBlog(c: Context) {
+    try {
+      const user = c.get('user');
+      if (user.role !== 'admin') {
+        return c.json({ error: 'Admin access required' }, 403);
+      }
+
+      const id = c.req.param('id');
+      const body = await c.req.json();
+      const validated = blogSchema.partial().parse(body);
+
+      const updateData = { ...validated };
+      if (validated.status === 'published' && !validated.published_at) {
+        updateData.published_at = new Date().toISOString();
+      } else if (validated.status === 'draft') {
+        updateData.published_at = null;
+      }
+
+      const { data: blog, error } = await supabase
+        .from('blogs')
+        .update(updateData)
+        .eq('id', id)
+        .select(`
+          *,
+          featured_media:media_library(*),
+          author:users(name),
+          blog_media:blog_media(
+            media:media_library(*)
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+      if (!blog) {
+        return c.json({ error: 'Blog not found' }, 404);
+      }
+
+      return c.json({ blog });
+    } catch (error) {
+      console.error('Update blog error:', error);
+      return c.json({ error: 'Failed to update blog' }, 400);
+    }
+  }
+
+  static async deleteBlog(c: Context) {
+    try {
+      const user = c.get('user');
+      if (user.role !== 'admin') {
+        return c.json({ error: 'Admin access required' }, 403);
+      }
+
+      const id = c.req.param('id');
+
+      // Get blog info for media cleanup
+      const { data: blog } = await supabase
+        .from('blogs')
+        .select('featured_media_id')
+        .eq('id', id)
+        .single();
+
+      // Delete blog media associations first
+      await supabase
+        .from('blog_media')
+        .delete()
+        .eq('blog_id', id);
+
+      // Delete blog
+      const { error } = await supabase
+        .from('blogs')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Cleanup featured media
+      if (blog?.featured_media_id) {
+        await AdminController.deleteMediaInternal(blog.featured_media_id);
+      }
+
+      return c.json({
+        message: 'Blog deleted successfully',
+        deleted_id: id
+      });
+    } catch (error) {
+      console.error('Delete blog error:', error);
+      return c.json({ error: 'Failed to delete blog' }, 500);
+    }
+  }
+
+  static async addBlogMedia(c: Context) {
+    try {
+      const user = c.get('user');
+      if (user.role !== 'admin') {
+        return c.json({ error: 'Admin access required' }, 403);
+      }
+
+      const blogId = c.req.param('id');
+      const { media_id, caption, display_order } = await c.req.json();
+
+      const { data: blogMedia, error } = await supabase
+        .from('blog_media')
+        .insert({
+          blog_id: blogId,
+          media_id,
+          caption,
+          display_order: display_order || 0
+        })
+        .select(`
+          *,
+          media:media_library(*)
+        `)
+        .single();
+
+      if (error) throw error;
+
+      return c.json({ blog_media: blogMedia }, 201);
+    } catch (error) {
+      console.error('Add blog media error:', error);
+      return c.json({ error: 'Failed to add media to blog' }, 400);
+    }
+  }
+
+  static async getAllBlogs(c: Context) {
+    try {
+      const user = c.get('user');
+      if (user.role !== 'admin') {
+        return c.json({ error: 'Admin access required' }, 403);
+      }
+
+      const { data: blogs, error } = await supabase
+        .from('blogs')
+        .select(`
+          *,
+          featured_media:media_library(*),
+          author:users(name),
+          blog_media:blog_media(
+            media:media_library(*)
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return c.json({ blogs });
+    } catch (error) {
+      console.error('Get all blogs error:', error);
+      return c.json({ error: 'Failed to fetch blogs' }, 500);
     }
   }
 
@@ -1446,6 +1661,85 @@ export class AdminController {
     } catch (error) {
       console.error('Cancel booking error:', error);
       return c.json({ error: 'Failed to cancel booking' }, 400);
+    }
+  }
+
+  // ==================== DELETE BOOKING ====================
+  static async deleteBooking(c: Context) {
+    try {
+      const user = c.get('user');
+      if (user.role !== 'admin') {
+        return c.json({ error: 'Admin access required' }, 403);
+      }
+
+      const id = c.req.param('id');
+
+      // Fetch booking first so we can notify the user
+      const { data: booking, error: fetchError } = await supabase
+        .from('bookings')
+        .select(`*, service:services(name), user:users!bookings_user_id_fkey(email, name)`)
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !booking) {
+        return c.json({ error: 'Booking not found' }, 404);
+      }
+
+      // Delete associated payment rows first (foreign key)
+      await supabase.from('payments').delete().eq('booking_id', id);
+
+      // Delete the booking
+      const { error: deleteError } = await supabase.from('bookings').delete().eq('id', id);
+      if (deleteError) throw deleteError;
+
+      // Notify the user
+      await supabase.from('notifications').insert({
+        user_id: booking.user_id,
+        type: 'booking_confirmation',
+        message: `Your booking for ${booking.service?.name} on ${booking.date} has been removed by admin.`,
+      });
+
+      return c.json({ message: 'Booking deleted successfully', booking_id: id });
+    } catch (error) {
+      console.error('Delete booking error:', error);
+      return c.json({ error: 'Failed to delete booking' }, 400);
+    }
+  }
+
+  // ==================== RESCHEDULE BOOKING ====================
+  static async rescheduleBooking(c: Context) {
+    try {
+      const user = c.get('user');
+      if (user.role !== 'admin') {
+        return c.json({ error: 'Admin access required' }, 403);
+      }
+
+      const id = c.req.param('id');
+      const { date, start_time, end_time } = await c.req.json();
+
+      if (!date || !start_time || !end_time) {
+        return c.json({ error: 'date, start_time, and end_time are required' }, 400);
+      }
+
+      // Update the booking schedule
+      const { data: booking, error } = await supabase
+        .from('bookings')
+        .update({ date, start_time, end_time, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select(`*, service:services(name, price), user:users!bookings_user_id_fkey(email, name)`)
+        .single();
+
+      if (error) throw error;
+      if (!booking) return c.json({ error: 'Booking not found' }, 404);
+
+      // Trigger unified automation (Meet update + Emails + Notifications)
+      const { MeetingAutomationService } = await import('../services/meetingAutomation.js');
+      await MeetingAutomationService.processSuccessfulPayment(id, undefined, true); // true for isReschedule
+
+      return c.json({ message: 'Booking rescheduled successfully', booking });
+    } catch (error) {
+      console.error('Reschedule booking error:', error);
+      return c.json({ error: 'Failed to reschedule booking' }, 400);
     }
   }
 

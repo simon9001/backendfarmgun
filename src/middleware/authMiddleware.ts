@@ -10,11 +10,14 @@ declare module 'hono' {
   }
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required for security.');
+}
 
 // JWT middleware for protected routes
 export const authMiddleware = jwt({
-  secret: JWT_SECRET,
+  secret: JWT_SECRET as string,
   alg: 'HS256', // Specify the algorithm
 });
 

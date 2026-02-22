@@ -8,8 +8,39 @@ CREATE TYPE payment_status AS ENUM ('pending','success','failed');
 CREATE TYPE notification_type AS ENUM ('booking_confirmation','reminder','payment_receipt');
 CREATE TYPE media_type AS ENUM ('image','video','document');
 CREATE TYPE media_category AS ENUM (
-  'homepage','project','crop','testimonial','profile','service','gallery','receipt','tip','partner'
+  'homepage','project','crop','testimonial','profile','service','gallery','receipt','tip','partner','blog'
 );
+
+-- ... existing tables ...
+
+CREATE TABLE blogs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) UNIQUE NOT NULL,
+    content TEXT NOT NULL,
+    excerpt TEXT,
+    featured_media_id UUID REFERENCES media_library(id),
+    author_id UUID REFERENCES users(id),
+    status tip_status DEFAULT 'draft',
+    published_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE blog_media (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    blog_id UUID REFERENCES blogs(id) ON DELETE CASCADE,
+    media_id UUID REFERENCES media_library(id) ON DELETE CASCADE,
+    caption TEXT,
+    display_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_blogs_status ON blogs(status);
+
+CREATE TRIGGER trg_blogs_updated_at
+BEFORE UPDATE ON blogs
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TYPE partner_category AS ENUM ('Suppliers', 'Finance', 'Equipment', 'Markets', 'Other');
 
 CREATE TYPE tip_status AS ENUM ('draft','published','archived');

@@ -5,7 +5,10 @@ import { supabase } from '../db/supabaseClient.js';
 import { registerSchema, loginSchema } from '../utils/validation.js';
 import { sendEmail } from '../utils/resend.js';
 import crypto from 'crypto';
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required for security.');
+}
 const SALT_ROUNDS = 10;
 export class AuthController {
     static async register(c) {
@@ -200,6 +203,11 @@ export class AuthController {
             console.error('Reset password error:', error);
             return c.json({ error: 'Something went wrong' }, 500);
         }
+    }
+    static async logout(c) {
+        // Since we are using JWT, server-side logout is mostly about returning a success response.
+        // In the future, this could be used to blacklist tokens if a blacklisting mechanism is implemented.
+        return c.json({ message: 'Logged out successfully' });
     }
 }
 //# sourceMappingURL=auth.js.map

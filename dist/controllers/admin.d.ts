@@ -135,6 +135,9 @@ export declare class AdminController {
         error: string;
     }, 400, "json">)>;
     static createTestimonial(c: Context): Promise<(Response & import("hono").TypedResponse<{
+        error: string;
+        message: string;
+    }, 403, "json">) | (Response & import("hono").TypedResponse<{
         testimonial: any;
     }, 201, "json">) | (Response & import("hono").TypedResponse<{
         error: string;

@@ -1,4 +1,4 @@
-export declare const sendEmail: (to: string, subject: string, html: string) => Promise<{
+export declare const sendEmail: (to: string, subject: string, html: string, from?: string) => Promise<{
     success: boolean;
     data: any;
     error?: never;

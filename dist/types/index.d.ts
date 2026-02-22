@@ -20,6 +20,15 @@ export interface Service {
     id: string;
     name: string;
     description?: string;
+    tagline?: string;
+    what_get?: string[];
+    pricing_options?: {
+        label: string;
+        price?: number;
+        currency: string;
+        note?: string;
+        is_custom: boolean;
+    }[];
     duration_mins: number;
     price: number;
     featured_media_id?: string;

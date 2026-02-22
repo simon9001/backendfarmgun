@@ -9,7 +9,10 @@ import { sendEmail } from '../utils/resend.js';
 import crypto from 'crypto';
 
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required for security.');
+}
 const SALT_ROUNDS = 10;
 
 export class AuthController {
@@ -55,7 +58,7 @@ export class AuthController {
         phone: user.phone, // Add phone if needed
       };
 
-      const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '7d' });
+      const token = jwt.sign(tokenPayload, JWT_SECRET as string, { expiresIn: '7d' });
 
       return c.json({
         user: {
@@ -107,7 +110,7 @@ export class AuthController {
         email: user.email,
       };
 
-      const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '7d' });
+      const token = jwt.sign(tokenPayload, JWT_SECRET as string, { expiresIn: '7d' });
 
       return c.json({
         user: {
@@ -238,5 +241,11 @@ export class AuthController {
       console.error('Reset password error:', error);
       return c.json({ error: 'Something went wrong' }, 500);
     }
+  }
+
+  static async logout(c: Context) {
+    // Since we are using JWT, server-side logout is mostly about returning a success response.
+    // In the future, this could be used to blacklist tokens if a blacklisting mechanism is implemented.
+    return c.json({ message: 'Logged out successfully' });
   }
 }

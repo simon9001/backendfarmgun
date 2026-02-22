@@ -3,6 +3,8 @@ export declare class PaymentsController {
     static initiatePayment(c: Context): Promise<(Response & import("hono").TypedResponse<{
         error: string;
     }, 404, "json">) | (Response & import("hono").TypedResponse<{
+        error: string;
+    }, 500, "json">) | (Response & import("hono").TypedResponse<{
         status: any;
         message: any;
         reference: any;

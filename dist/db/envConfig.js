@@ -38,21 +38,34 @@ export const env = {
     CLOUDINARY_API_SECRET: (process.env.CLOUDINARY_API_SECRET || "").trim(),
     PAYSTACK_SECRET_KEY: (process.env.PAYSTACK_SECRET_KEY || "").trim(),
     RESEND_API_KEY: (process.env.RESEND_API_KEY || "").trim(),
+    GOOGLE_CLIENT_EMAIL: (process.env.GOOGLE_CLIENT_EMAIL || "").trim(),
+    GOOGLE_PRIVATE_KEY: (process.env.GOOGLE_PRIVATE_KEY || "").replace(/\\n/g, '\n').trim(),
+    GOOGLE_CALENDAR_ID: (process.env.GOOGLE_CALENDAR_ID || "37c8de4ae5e593a7747472d3ca78e4f479a184bfde4ba1d3287109ec434b2250@group.calendar.google.com").trim(),
+    RESEND_FROM_EMAIL: (process.env.RESEND_FROM_EMAIL || "Farm with Irene <no-reply@farmwithirene.online>").trim(),
 };
 // Validation function
 export const validateEnv = () => {
     console.log("\n=== Validating Environment ===");
-    const required = [
+    const core = [
         'SUPABASE_URL',
         'SUPABASE_SERVICE_KEY',
         'JWT_SECRET',
         'PAYSTACK_SECRET_KEY',
         'RESEND_API_KEY'
     ];
-    for (const key of required) {
+    const optional = [
+        'GOOGLE_CLIENT_EMAIL',
+        'GOOGLE_PRIVATE_KEY'
+    ];
+    for (const key of core) {
         if (!env[key]) {
-            console.error(`❌ ${key} is missing`);
+            console.error(`❌ ${key} is missing (CORE SERVICE)`);
             return false;
+        }
+    }
+    for (const key of optional) {
+        if (!env[key]) {
+            console.warn(`⚠️  ${key} is missing (Google Meet feature will be disabled)`);
         }
     }
     console.log("✅ All required environment variables are present");

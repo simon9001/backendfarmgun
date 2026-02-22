@@ -17,6 +17,15 @@ export declare const loginSchema: z.ZodObject<{
 export declare const serviceSchema: z.ZodObject<{
     name: z.ZodString;
     description: z.ZodOptional<z.ZodString>;
+    tagline: z.ZodOptional<z.ZodString>;
+    what_get: z.ZodOptional<z.ZodArray<z.ZodString>>;
+    pricing_options: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        label: z.ZodString;
+        price: z.ZodOptional<z.ZodNumber>;
+        currency: z.ZodDefault<z.ZodString>;
+        note: z.ZodOptional<z.ZodString>;
+        is_custom: z.ZodDefault<z.ZodBoolean>;
+    }, z.core.$strip>>>;
     duration_mins: z.ZodNumber;
     price: z.ZodNumber;
     featured_media_id: z.ZodPipe<z.ZodTransform<unknown, unknown>, z.ZodOptional<z.ZodString>>;
@@ -115,5 +124,30 @@ export declare const availabilitySchema: z.ZodObject<{
     start_time: z.ZodString;
     end_time: z.ZodString;
     is_available: z.ZodDefault<z.ZodBoolean>;
+}, z.core.$strip>;
+export declare const partnerInterestSchema: z.ZodObject<{
+    company_name: z.ZodString;
+    contact_person: z.ZodString;
+    email: z.ZodString;
+    phone: z.ZodString;
+    partnership_type: z.ZodEnum<{
+        sponsorship: "sponsorship";
+        "co-branding": "co-branding";
+        equipment: "equipment";
+        funding: "funding";
+        mentorship: "mentorship";
+        other: "other";
+    }>;
+    budget_resources: z.ZodString;
+    interest_reason: z.ZodString;
+    status: z.ZodDefault<z.ZodEnum<{
+        pending: "pending";
+        reviewed: "reviewed";
+        proposal_requested: "proposal_requested";
+        evaluated: "evaluated";
+        negotiating: "negotiating";
+        approved: "approved";
+        declined: "declined";
+    }>>;
 }, z.core.$strip>;
 //# sourceMappingURL=validation.d.ts.map

@@ -1,7 +1,10 @@
 import { jwt } from 'hono/jwt';
 import jwtModule from 'jsonwebtoken'; // Fix for ESM import
 const { verify } = jwtModule;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required for security.');
+}
 // JWT middleware for protected routes
 export const authMiddleware = jwt({
     secret: JWT_SECRET,
