@@ -1589,6 +1589,7 @@ export class AdminController {
             message: status
               ? `Your booking status has been updated to ${status}`
               : 'Meeting link has been added to your booking',
+            sent_at: new Date().toISOString(),
           });
       }
 
@@ -1635,6 +1636,7 @@ export class AdminController {
           user_id: booking.user_id,
           type: 'booking_confirmation',
           message: `Your booking has been cancelled${reason ? `: ${reason}` : ''}`,
+          sent_at: new Date().toISOString(),
         });
 
       // Refund payment if exists
@@ -1697,6 +1699,7 @@ export class AdminController {
         user_id: booking.user_id,
         type: 'booking_confirmation',
         message: `Your booking for ${booking.service?.name} on ${booking.date} has been removed by admin.`,
+        sent_at: new Date().toISOString(),
       });
 
       return c.json({ message: 'Booking deleted successfully', booking_id: id });

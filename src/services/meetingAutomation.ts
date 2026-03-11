@@ -193,6 +193,7 @@ export class MeetingAutomationService {
                     : (isVirtual
                         ? `Your virtual session for ${booking.service.name} is confirmed! Check your email for the meeting link.`
                         : `Your booking for ${booking.service.name} is confirmed! We'll coordinate the visit details via phone.`),
+                sent_at: new Date().toISOString(),
             });
 
             console.log(`✅ Meeting automation completed for booking ${bookingId}`);

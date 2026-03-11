@@ -288,6 +288,7 @@ export class BookingsController {
           user_id: booking.user_id,
           type: 'booking_confirmation',
           message: `Your booking status has been updated to ${status}`,
+          sent_at: new Date().toISOString(),
         });
 
       return c.json({ booking });
