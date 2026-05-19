@@ -193,6 +193,11 @@ export declare class AdminController {
     }, import("hono/utils/http-status").ContentfulStatusCode, "json">) | (Response & import("hono").TypedResponse<{
         error: string;
     }, 500, "json">)>;
+    static getAllTips(c: Context): Promise<(Response & import("hono").TypedResponse<{
+        error: string;
+    }, 403, "json">) | (Response & import("hono").TypedResponse<never, import("hono/utils/http-status").ContentfulStatusCode, "json">) | (Response & import("hono").TypedResponse<{
+        error: string;
+    }, 500, "json">)>;
     static addTipMedia(c: Context): Promise<(Response & import("hono").TypedResponse<{
         error: string;
     }, 403, "json">) | (Response & import("hono").TypedResponse<{
@@ -200,6 +205,42 @@ export declare class AdminController {
     }, 201, "json">) | (Response & import("hono").TypedResponse<{
         error: string;
     }, 400, "json">)>;
+    static createBlog(c: Context): Promise<(Response & import("hono").TypedResponse<{
+        error: string;
+    }, 403, "json">) | (Response & import("hono").TypedResponse<{
+        blog: any;
+    }, 201, "json">) | (Response & import("hono").TypedResponse<{
+        error: string;
+    }, 400, "json">)>;
+    static updateBlog(c: Context): Promise<(Response & import("hono").TypedResponse<{
+        error: string;
+    }, 403, "json">) | (Response & import("hono").TypedResponse<{
+        error: string;
+    }, 404, "json">) | (Response & import("hono").TypedResponse<{
+        blog: any;
+    }, import("hono/utils/http-status").ContentfulStatusCode, "json">) | (Response & import("hono").TypedResponse<{
+        error: string;
+    }, 400, "json">)>;
+    static deleteBlog(c: Context): Promise<(Response & import("hono").TypedResponse<{
+        error: string;
+    }, 403, "json">) | (Response & import("hono").TypedResponse<{
+        message: string;
+        deleted_id: string;
+    }, import("hono/utils/http-status").ContentfulStatusCode, "json">) | (Response & import("hono").TypedResponse<{
+        error: string;
+    }, 500, "json">)>;
+    static addBlogMedia(c: Context): Promise<(Response & import("hono").TypedResponse<{
+        error: string;
+    }, 403, "json">) | (Response & import("hono").TypedResponse<{
+        blog_media: any;
+    }, 201, "json">) | (Response & import("hono").TypedResponse<{
+        error: string;
+    }, 400, "json">)>;
+    static getAllBlogs(c: Context): Promise<(Response & import("hono").TypedResponse<{
+        error: string;
+    }, 403, "json">) | (Response & import("hono").TypedResponse<never, import("hono/utils/http-status").ContentfulStatusCode, "json">) | (Response & import("hono").TypedResponse<{
+        error: string;
+    }, 500, "json">)>;
     static getAllBookings(c: Context): Promise<(Response & import("hono").TypedResponse<{
         error: string;
     }, 403, "json">) | (Response & import("hono").TypedResponse<{
@@ -234,6 +275,26 @@ export declare class AdminController {
     }, import("hono/utils/http-status").ContentfulStatusCode, "json">) | (Response & import("hono").TypedResponse<{
         error: string;
     }, 400, "json">)>;
+    static deleteBooking(c: Context): Promise<(Response & import("hono").TypedResponse<{
+        error: string;
+    }, 403, "json">) | (Response & import("hono").TypedResponse<{
+        error: string;
+    }, 404, "json">) | (Response & import("hono").TypedResponse<{
+        message: string;
+        booking_id: string;
+    }, import("hono/utils/http-status").ContentfulStatusCode, "json">) | (Response & import("hono").TypedResponse<{
+        error: string;
+    }, 400, "json">)>;
+    static rescheduleBooking(c: Context): Promise<(Response & import("hono").TypedResponse<{
+        error: string;
+    }, 403, "json">) | (Response & import("hono").TypedResponse<{
+        error: string;
+    }, 400, "json">) | (Response & import("hono").TypedResponse<{
+        error: string;
+    }, 404, "json">) | (Response & import("hono").TypedResponse<{
+        message: string;
+        booking: any;
+    }, import("hono/utils/http-status").ContentfulStatusCode, "json">)>;
     static getAllUsers(c: Context): Promise<(Response & import("hono").TypedResponse<{
         error: string;
     }, 403, "json">) | (Response & import("hono").TypedResponse<{

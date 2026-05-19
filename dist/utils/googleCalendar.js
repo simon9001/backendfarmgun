@@ -1,15 +1,38 @@
 import { google } from 'googleapis';
 import { env } from '../db/envConfig.js';
 const SCOPES = ['https://www.googleapis.com/auth/calendar.events'];
-const CALENDAR_ID = env.GOOGLE_CALENDAR_ID;
-const auth = new google.auth.JWT({
-    email: env.GOOGLE_CLIENT_EMAIL,
-    key: env.GOOGLE_PRIVATE_KEY,
-    scopes: SCOPES,
-});
-const calendar = google.calendar({ version: 'v3', auth });
+/**
+ * Creates a Google Calendar event with a Google Meet link.
+ *
+ * Group calendars (@group.calendar.google.com) do NOT support
+ * the `hangoutsMeet` conference type. To get a Meet link we need
+ * to create the event on a real user's calendar via domain-wide
+ * delegation (impersonation).
+ *
+ * Setup required in Google Workspace Admin Console:
+ *   1. Enable domain-wide delegation for your service account.
+ *   2. Authorize scope: https://www.googleapis.com/auth/calendar.events
+ *   3. Set GOOGLE_ADMIN_EMAIL in .env to the Workspace user to impersonate.
+ */
 export const createGoogleMeet = async (details) => {
     try {
+        // Impersonate the admin user so we can create events on their
+        // primary calendar (which supports Google Meet).
+        const adminEmail = env.GOOGLE_ADMIN_EMAIL;
+        const jwtOptions = {
+            email: env.GOOGLE_CLIENT_EMAIL,
+            key: env.GOOGLE_PRIVATE_KEY,
+            scopes: SCOPES,
+        };
+        if (adminEmail) {
+            jwtOptions.subject = adminEmail; // impersonate admin user
+        }
+        const auth = new google.auth.JWT(jwtOptions);
+        const calendar = google.calendar({ version: 'v3', auth });
+        // If we have an admin email, use their primary calendar (supports Meet).
+        // Otherwise fall back to the group calendar (no Meet link).
+        const calendarId = adminEmail ? 'primary' : env.GOOGLE_CALENDAR_ID;
+        const includeConference = !!adminEmail;
         const event = {
             summary: details.summary,
             description: details.description,
@@ -21,29 +44,28 @@ export const createGoogleMeet = async (details) => {
                 dateTime: details.endDateTime,
                 timeZone: 'Africa/Nairobi',
             },
-            conferenceData: {
+            // No attendees — we send the Meet link via our own email instead
+        };
+        if (includeConference) {
+            event.conferenceData = {
                 createRequest: {
                     requestId: `meet-${Date.now()}`,
                     conferenceSolutionKey: { type: 'hangoutsMeet' },
                 },
-            },
-            attendees: [
-                { email: details.userEmail },
-                // Admin attendees will be added in the automation service
-            ],
-        };
+            };
+        }
         const response = await calendar.events.insert({
-            calendarId: CALENDAR_ID,
+            calendarId,
             requestBody: event,
-            conferenceDataVersion: 1,
+            conferenceDataVersion: includeConference ? 1 : 0,
         });
         const meetLink = response.data.hangoutLink;
         if (!meetLink) {
-            throw new Error('Google Meet link was not generated');
+            console.warn('⚠️ Calendar event created but no Meet link generated. Is GOOGLE_ADMIN_EMAIL set?');
         }
         return {
             id: response.data.id,
-            link: meetLink,
+            link: meetLink || '',
             data: response.data
         };
     }

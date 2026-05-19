@@ -41,6 +41,7 @@ export const env = {
     GOOGLE_CLIENT_EMAIL: (process.env.GOOGLE_CLIENT_EMAIL || "").trim(),
     GOOGLE_PRIVATE_KEY: (process.env.GOOGLE_PRIVATE_KEY || "").replace(/\\n/g, '\n').trim(),
     GOOGLE_CALENDAR_ID: (process.env.GOOGLE_CALENDAR_ID || "37c8de4ae5e593a7747472d3ca78e4f479a184bfde4ba1d3287109ec434b2250@group.calendar.google.com").trim(),
+    GOOGLE_ADMIN_EMAIL: (process.env.GOOGLE_ADMIN_EMAIL || "").trim(),
     RESEND_FROM_EMAIL: (process.env.RESEND_FROM_EMAIL || "Farm with Irene <no-reply@farmwithirene.online>").trim(),
 };
 // Validation function

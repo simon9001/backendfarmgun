@@ -15,6 +15,7 @@ export declare const env: {
     GOOGLE_CLIENT_EMAIL: string;
     GOOGLE_PRIVATE_KEY: string;
     GOOGLE_CALENDAR_ID: string;
+    GOOGLE_ADMIN_EMAIL: string;
     RESEND_FROM_EMAIL: string;
 };
 export declare const validateEnv: () => boolean;

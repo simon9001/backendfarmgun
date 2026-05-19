@@ -37,6 +37,7 @@ export declare const bookingSchema: z.ZodObject<{
     start_time: z.ZodString;
     user_notes: z.ZodOptional<z.ZodString>;
     payment_phone: z.ZodString;
+    pricing_option: z.ZodOptional<z.ZodString>;
 }, z.core.$strip>;
 export declare const cropSchema: z.ZodObject<{
     name: z.ZodString;
@@ -62,6 +63,19 @@ export declare const testimonialSchema: z.ZodObject<{
     rating: z.ZodOptional<z.ZodNumber>;
     project_id: z.ZodPipe<z.ZodTransform<unknown, unknown>, z.ZodOptional<z.ZodString>>;
     user_media_id: z.ZodPipe<z.ZodTransform<unknown, unknown>, z.ZodOptional<z.ZodString>>;
+}, z.core.$strip>;
+export declare const blogSchema: z.ZodObject<{
+    title: z.ZodString;
+    slug: z.ZodString;
+    content: z.ZodString;
+    excerpt: z.ZodOptional<z.ZodString>;
+    featured_media_id: z.ZodPipe<z.ZodTransform<unknown, unknown>, z.ZodOptional<z.ZodString>>;
+    status: z.ZodDefault<z.ZodEnum<{
+        draft: "draft";
+        published: "published";
+        archived: "archived";
+    }>>;
+    published_at: z.ZodOptional<z.ZodNullable<z.ZodString>>;
 }, z.core.$strip>;
 export declare const tipSchema: z.ZodObject<{
     title: z.ZodString;
@@ -95,6 +109,7 @@ export declare const mediaSchema: z.ZodObject<{
         receipt: "receipt";
         tip: "tip";
         partner: "partner";
+        blog: "blog";
     }>>;
     alt_text: z.ZodOptional<z.ZodString>;
     description: z.ZodOptional<z.ZodString>;

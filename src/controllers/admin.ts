@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { supabase } from '../db/supabaseClient.js';
+import { z } from 'zod';
 import {
   projectSchema,
   testimonialSchema,
@@ -272,6 +273,10 @@ export class AdminController {
       return c.json({ service: fullService }, 201);
     } catch (error) {
       console.error('Create service error:', error);
+      if (error instanceof z.ZodError) {
+        const details = error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ');
+        return c.json({ error: `Validation failed: ${details}` }, 400);
+      }
       return c.json({ error: 'Failed to create service' }, 400);
     }
   }
@@ -334,6 +339,10 @@ export class AdminController {
       return c.json({ service: fullService });
     } catch (error) {
       console.error('Update service error:', error);
+      if (error instanceof z.ZodError) {
+        const details = error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ');
+        return c.json({ error: `Validation failed: ${details}` }, 400);
+      }
       return c.json({ error: 'Failed to update service' }, 400);
     }
   }
@@ -526,6 +535,10 @@ export class AdminController {
       return c.json({ crop: updatedCrop || crop }, 201);
     } catch (error) {
       console.error('Create crop error:', error);
+      if (error instanceof z.ZodError) {
+        const details = error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ');
+        return c.json({ error: `Validation failed: ${details}` }, 400);
+      }
       return c.json({ error: 'Failed to create crop' }, 400);
     }
   }
@@ -602,6 +615,10 @@ export class AdminController {
       return c.json({ crop: updatedCrop || crop });
     } catch (error) {
       console.error('Update crop error:', error);
+      if (error instanceof z.ZodError) {
+        const details = error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ');
+        return c.json({ error: `Validation failed: ${details}` }, 400);
+      }
       return c.json({ error: 'Failed to update crop' }, 400);
     }
   }

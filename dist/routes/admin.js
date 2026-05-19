@@ -29,14 +29,23 @@ adminRoutes.post('/testimonials', AdminController.createTestimonial);
 adminRoutes.patch('/testimonials/:id', AdminController.updateTestimonial);
 adminRoutes.delete('/testimonials/:id', AdminController.deleteTestimonial);
 adminRoutes.patch('/testimonials/:id/approve', AdminController.approveTestimonial);
-// Tips/Blog Management
+// Tips Management
+adminRoutes.get('/tips', AdminController.getAllTips);
 adminRoutes.post('/tips', AdminController.createTip);
 adminRoutes.patch('/tips/:id', AdminController.updateTip);
 adminRoutes.delete('/tips/:id', AdminController.deleteTip);
 adminRoutes.post('/tips/:id/media', AdminController.addTipMedia);
+// Blogs Management
+adminRoutes.get('/blogs', AdminController.getAllBlogs);
+adminRoutes.post('/blogs', AdminController.createBlog);
+adminRoutes.patch('/blogs/:id', AdminController.updateBlog);
+adminRoutes.delete('/blogs/:id', AdminController.deleteBlog);
+adminRoutes.post('/blogs/:id/media', AdminController.addBlogMedia);
 // Bookings Management
 adminRoutes.get('/bookings', AdminController.getAllBookings);
 adminRoutes.patch('/bookings/:id', AdminController.updateBooking);
+adminRoutes.post('/bookings/:id/reschedule', AdminController.rescheduleBooking);
+adminRoutes.delete('/bookings/:id', AdminController.deleteBooking);
 adminRoutes.delete('/bookings/:id/cancel', AdminController.cancelBookingAdmin);
 // Users Management
 adminRoutes.get('/users', AdminController.getAllUsers);

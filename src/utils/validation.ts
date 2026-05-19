@@ -34,7 +34,7 @@ export const serviceSchema = z.object({
     note: z.string().optional(),
     is_custom: z.boolean().default(false)
   })).optional(),
-  duration_mins: z.number().int().positive(),
+  duration_mins: z.number().int().nonnegative(),
   price: z.number().positive(),
   featured_media_id: optionalUuid,
   crops: z.array(z.string().uuid()).optional(),
