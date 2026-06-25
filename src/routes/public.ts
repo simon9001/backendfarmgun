@@ -1799,3 +1799,72 @@ publicRoutes.get('/crop-prices', cropPricesLimiter, async (c) => {
 
   return c.html(html);
 });
+
+// Lowest price band — returns the cheapest crops in the bottom quartile for a given date
+publicRoutes.get('/crop-prices/lowest-band', cropPricesLimiter, async (c) => {
+  c.header('Access-Control-Allow-Origin', '*');
+  c.header('Access-Control-Allow-Methods', 'GET');
+
+  const { date, percentile = '25' } = c.req.query();
+
+  const pct = parseFloat(percentile);
+  if (isNaN(pct) || pct <= 0 || pct > 100) {
+    return c.json({ error: 'Invalid percentile. Must be between 1 and 100.' }, 400);
+  }
+
+  const priceDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date)
+    ? date
+    : new Date().toISOString().split('T')[0];
+
+  // Fetch all prices for the date, ordered cheapest first
+  const { data: prices, error } = await supabase
+    .from('crop_prices')
+    .select('id, crop_name, price_per_unit, unit, market, price_date, price_change')
+    .eq('price_date', priceDate)
+    .order('price_per_unit', { ascending: true });
+
+  if (error) {
+    console.error('Lowest band fetch error:', error);
+    return c.json({ error: 'Failed to fetch crop prices' }, 500);
+  }
+
+  // Fall back to latest available date if today has no data
+  let finalPrices = prices ?? [];
+  let finalDate   = priceDate;
+
+  if (finalPrices.length === 0 && !date) {
+    const { data: latest, error: latestErr } = await supabase
+      .from('crop_prices')
+      .select('id, crop_name, price_per_unit, unit, market, price_date, price_change')
+      .order('price_date',      { ascending: false })
+      .order('price_per_unit',  { ascending: true })
+      .limit(200);
+
+    if (latestErr) return c.json({ error: 'Failed to fetch crop prices' }, 500);
+    finalPrices = latest ?? [];
+    finalDate   = finalPrices[0]?.price_date ?? null;
+  }
+
+  if (finalPrices.length === 0) {
+    return c.json({ band: [], price_date: finalDate, meta: { total: 0, band_size: 0, percentile: pct } });
+  }
+
+  // Slice to the bottom percentile
+  const bandSize  = Math.max(1, Math.ceil((pct / 100) * finalPrices.length));
+  const band      = finalPrices.slice(0, bandSize);
+  const prices_arr = band.map((p: any) => p.price_per_unit as number);
+  const bandMin   = Math.min(...prices_arr);
+  const bandMax   = Math.max(...prices_arr);
+
+  return c.json({
+    band,
+    price_date: finalDate,
+    meta: {
+      total:      finalPrices.length,
+      band_size:  band.length,
+      percentile: pct,
+      band_min:   bandMin,
+      band_max:   bandMax,
+    },
+  });
+});
