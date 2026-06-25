@@ -48,6 +48,7 @@
     "node_modules",
     "dist",
     "**/*.test.ts",
-    "**/*.spec.ts"
+    "**/*.spec.ts",
+    "src/db/seed-crop-prices.ts"
   ]
 }
