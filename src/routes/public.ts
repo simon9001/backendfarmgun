@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import RateLimit from 'hono-rate-limit';
 import { supabase } from '../db/supabaseClient.js';
 // import { CloudinaryService } from '../utils/cloudinary.js';
 import { optimizeMedia, FeaturedMedia } from '../utils/media.js';
@@ -1455,4 +1456,346 @@ publicRoutes.get('/stats', async (c) => {
     console.error('Stats fetch error:', error);
     return c.json({ error: 'Failed to fetch statistics' }, 500);
   }
+});
+
+// Crop Prices - Public, open to all origins, rate limited against DDoS
+const cropPricesLimiter = RateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  message: JSON.stringify({ error: 'Too many requests, please slow down.' }),
+  statusCode: 429,
+});
+
+publicRoutes.get('/crop-prices', cropPricesLimiter, async (c) => {
+  c.header('Access-Control-Allow-Origin', '*');
+  c.header('Access-Control-Allow-Methods', 'GET');
+
+  const { date, limit = '50', offset = '0', format } = c.req.query();
+
+  const limitNum  = parseInt(limit,  10);
+  const offsetNum = parseInt(offset, 10);
+
+  if (isNaN(limitNum) || limitNum < 1 || limitNum > 200 || isNaN(offsetNum) || offsetNum < 0) {
+    return c.json({ error: 'Invalid pagination parameters' }, 400);
+  }
+
+  const priceDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date)
+    ? date
+    : new Date().toISOString().split('T')[0];
+
+  const COLS = `id, crop_name, price_per_unit, unit, market, price_date, price_change, commentary, outlook, created_at`;
+
+  const { data: prices, error } = await supabase
+    .from('crop_prices')
+    .select(COLS)
+    .eq('price_date', priceDate)
+    .order('crop_name', { ascending: true })
+    .range(offsetNum, offsetNum + limitNum - 1);
+
+  if (error) {
+    console.error('Crop prices fetch error:', error);
+    return c.json({ error: 'Failed to fetch crop prices' }, 500);
+  }
+
+  let finalPrices  = prices || [];
+  let finalDate    = priceDate;
+  let isLatest     = false;
+
+  if (finalPrices.length === 0 && !date) {
+    const { data: latestPrices, error: latestError } = await supabase
+      .from('crop_prices')
+      .select(COLS)
+      .order('price_date', { ascending: false })
+      .order('crop_name',  { ascending: true })
+      .limit(limitNum);
+
+    if (latestError) return c.json({ error: 'Failed to fetch crop prices' }, 500);
+    finalPrices = latestPrices || [];
+    finalDate   = finalPrices[0]?.price_date ?? null;
+    isLatest    = true;
+  }
+
+  // ── Content negotiation ──────────────────────────────────────────────────
+  const wantsHtml = format !== 'json' &&
+    (c.req.header('Accept') ?? '').includes('text/html');
+
+  if (!wantsHtml) {
+    return c.json({
+      prices: finalPrices,
+      price_date: finalDate,
+      meta: { count: finalPrices.length, is_latest_available: isLatest }
+    });
+  }
+
+  // ── Build HTML ───────────────────────────────────────────────────────────
+  const esc = (s: unknown) =>
+    String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  const commentary = finalPrices.find((p: any) => p.commentary)?.commentary ?? '';
+  const outlook    = finalPrices.find((p: any) => p.outlook)?.outlook       ?? '';
+  const sorted     = [...finalPrices].sort((a: any, b: any) => b.price_per_unit - a.price_per_unit);
+  const highest    = sorted[0]       as any;
+  const lowest     = sorted[sorted.length - 1] as any;
+  const withChange = finalPrices.filter((p: any) => p.price_change !== null && p.price_change !== undefined) as any[];
+  const bigMover   = withChange.length
+    ? withChange.reduce((a: any, b: any) => Math.abs(a.price_change) > Math.abs(b.price_change) ? a : b)
+    : null;
+
+  const displayDate = finalDate
+    ? new Date(finalDate + 'T12:00:00').toLocaleDateString('en-KE', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      })
+    : '—';
+
+  const jsonUrl = c.req.url.includes('?') ? c.req.url + '&format=json' : c.req.url + '?format=json';
+
+  const changePill = (p: any) => {
+    if (p.price_change === null || p.price_change === undefined) return '';
+    const v = Number(p.price_change);
+    const label = (v > 0 ? '+' : '') + v.toFixed(1) + '%';
+    const icon  = v > 0 ? '▲' : v < 0 ? '▼' : '●';
+    const cls   = v > 0 ? 'up' : v < 0 ? 'down' : 'flat';
+    return `<span class="badge ${cls}">${icon} ${esc(label)}</span>`;
+  };
+
+  const priceCards = finalPrices.map((p: any) => `
+    <div class="card">
+      <div class="card-top">
+        <span class="crop-name">${esc(p.crop_name)}</span>
+        ${changePill(p)}
+      </div>
+      <div class="price">KES ${Number(p.price_per_unit).toLocaleString()}<span class="unit"> / ${esc(p.unit)}</span></div>
+      <div class="market">📍 ${esc(p.market)}</div>
+    </div>`).join('');
+
+  const statCards = highest && lowest ? `
+    <div class="stat-grid">
+      <div class="stat"><div class="stat-label">Highest Price</div>
+        <div class="stat-crop">${esc(highest.crop_name)}</div>
+        <div class="stat-value green">KES ${Number(highest.price_per_unit).toLocaleString()} / ${esc(highest.unit)}</div>
+      </div>
+      <div class="stat"><div class="stat-label">Lowest Price</div>
+        <div class="stat-crop">${esc(lowest.crop_name)}</div>
+        <div class="stat-value blue">KES ${Number(lowest.price_per_unit).toLocaleString()} / ${esc(lowest.unit)}</div>
+      </div>
+      ${bigMover ? `<div class="stat"><div class="stat-label">Biggest Mover</div>
+        <div class="stat-crop">${esc(bigMover.crop_name)}</div>
+        <div class="stat-value ${bigMover.price_change > 0 ? 'green' : 'red'}">${bigMover.price_change > 0 ? '+' : ''}${Number(bigMover.price_change).toFixed(1)}% today</div>
+      </div>` : ''}
+    </div>` : '';
+
+  const commentaryBlock = commentary ? `
+    <div class="insight-box green-box">
+      <div class="insight-label">💬 What Caused These Prices</div>
+      <p>${esc(commentary)}</p>
+    </div>` : '';
+
+  const outlookBlock = outlook ? `
+    <div class="insight-box teal-box">
+      <div class="insight-label">🔭 What to Expect Next</div>
+      <p>${esc(outlook)}</p>
+    </div>` : '';
+
+  const noDataMsg = finalPrices.length === 0
+    ? `<div class="no-data">No prices have been posted yet. Check back soon.</div>`
+    : '';
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Farm with Irene — Market Prices</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #07100a;
+      color: #d1fae5;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      padding-bottom: 3rem;
+    }
+    a { color: #4ade80; }
+
+    /* ── Top bar ── */
+    .topbar {
+      background: linear-gradient(135deg, #052e16 0%, #0a1f0f 100%);
+      border-bottom: 1px solid rgba(74,222,128,.12);
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .logo { font-size: 1.1rem; font-weight: 800; color: #4ade80; letter-spacing: -.02em; }
+    .logo span { color: #86efac; font-weight: 400; }
+    .live-badge {
+      display: inline-flex; align-items: center; gap: .45rem;
+      background: rgba(74,222,128,.1); border: 1px solid rgba(74,222,128,.25);
+      color: #4ade80; font-size: .7rem; font-weight: 700;
+      padding: .3rem .75rem; border-radius: 9999px; letter-spacing: .08em;
+    }
+    .live-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: #4ade80;
+      animation: ping 1.4s ease-in-out infinite;
+    }
+    @keyframes ping { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.5)} }
+    .json-btn {
+      background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12);
+      color: #94a3b8; font-size: .72rem; font-weight: 600;
+      padding: .35rem .85rem; border-radius: .5rem; cursor: pointer;
+      text-decoration: none; transition: all .2s;
+    }
+    .json-btn:hover { background: rgba(255,255,255,.1); color: #e2e8f0; }
+
+    /* ── Hero date strip ── */
+    .date-strip {
+      text-align: center; padding: 2.5rem 1rem 1.5rem;
+    }
+    .date-strip .eyebrow {
+      font-size: .7rem; font-weight: 700; letter-spacing: .12em;
+      color: rgba(74,222,128,.6); text-transform: uppercase; margin-bottom: .5rem;
+    }
+    .date-strip h1 {
+      font-size: clamp(1.4rem, 4vw, 2.2rem); font-weight: 900;
+      color: #f0fdf4; letter-spacing: -.03em;
+    }
+    .date-strip .sub {
+      margin-top: .35rem; font-size: .82rem; color: rgba(209,250,229,.4);
+    }
+
+    /* ── Container ── */
+    .wrap { max-width: 960px; margin: 0 auto; padding: 0 1rem; }
+
+    /* ── Stat grid ── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: .75rem; margin-bottom: 2rem;
+    }
+    .stat {
+      background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
+      border-radius: 1rem; padding: 1rem 1.25rem;
+    }
+    .stat-label { font-size: .65rem; font-weight: 700; letter-spacing: .1em;
+      color: rgba(209,250,229,.4); text-transform: uppercase; margin-bottom: .4rem; }
+    .stat-crop  { font-size: 1.05rem; font-weight: 800; color: #f0fdf4; margin-bottom: .2rem; }
+    .stat-value { font-size: .85rem; font-weight: 700; }
+    .green { color: #4ade80; }
+    .blue  { color: #60a5fa; }
+    .red   { color: #f87171; }
+
+    /* ── Price cards ── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: .75rem; margin-bottom: 2rem;
+    }
+    .card {
+      background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.07);
+      border-radius: 1rem; padding: 1rem 1.1rem;
+      transition: background .2s, border-color .2s, transform .15s;
+    }
+    .card:hover { background: rgba(74,222,128,.06); border-color: rgba(74,222,128,.2); transform: translateY(-2px); }
+    .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; margin-bottom: .6rem; }
+    .crop-name { font-size: .9rem; font-weight: 700; color: #f0fdf4; line-height: 1.3; }
+    .price { font-size: 1.35rem; font-weight: 900; color: #4ade80; margin-bottom: .45rem; }
+    .unit  { font-size: .8rem; font-weight: 400; color: rgba(209,250,229,.4); }
+    .market { font-size: .7rem; color: rgba(209,250,229,.35); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ── Change badges ── */
+    .badge {
+      display: inline-flex; align-items: center; gap: .2rem;
+      font-size: .68rem; font-weight: 800; padding: .22rem .55rem;
+      border-radius: 9999px; white-space: nowrap; border: 1px solid transparent;
+      flex-shrink: 0;
+    }
+    .badge.up   { background: rgba(74,222,128,.15); color: #4ade80; border-color: rgba(74,222,128,.25); }
+    .badge.down { background: rgba(248,113,113,.15); color: #f87171; border-color: rgba(248,113,113,.25); }
+    .badge.flat { background: rgba(255,255,255,.08);  color: #94a3b8; border-color: rgba(255,255,255,.1); }
+
+    /* ── Insight boxes ── */
+    .insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: .75rem; margin-bottom: 2rem; }
+    .insight-box { border-radius: 1rem; padding: 1.25rem 1.4rem; border: 1px solid; }
+    .green-box { background: rgba(74,222,128,.05); border-color: rgba(74,222,128,.15); }
+    .teal-box  { background: rgba(52,211,153,.05);  border-color: rgba(52,211,153,.15); }
+    .insight-label {
+      font-size: .68rem; font-weight: 800; letter-spacing: .1em;
+      text-transform: uppercase; margin-bottom: .65rem;
+    }
+    .green-box .insight-label { color: #4ade80; }
+    .teal-box  .insight-label { color: #34d399; }
+    .insight-box p { font-size: .82rem; line-height: 1.7; color: rgba(209,250,229,.65); }
+
+    /* ── No data ── */
+    .no-data {
+      text-align: center; padding: 4rem 1rem;
+      color: rgba(209,250,229,.3); font-size: .9rem;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      margin-top: 3rem; padding: 1.25rem 1rem;
+      border-top: 1px solid rgba(255,255,255,.06);
+      text-align: center;
+      font-size: .72rem; color: rgba(209,250,229,.25);
+    }
+    .footer a { color: rgba(74,222,128,.5); }
+
+    /* ── Divider ── */
+    .section-label {
+      font-size: .65rem; font-weight: 800; letter-spacing: .12em;
+      color: rgba(209,250,229,.3); text-transform: uppercase;
+      margin-bottom: .85rem;
+    }
+    .divider { height: 1px; background: rgba(255,255,255,.06); margin: 1.75rem 0; }
+  </style>
+</head>
+<body>
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="logo">Farm with Irene <span>· Market Prices</span></div>
+    <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+      <span class="live-badge"><span class="live-dot"></span> Live Data</span>
+      <a class="json-btn" href="${esc(jsonUrl)}">{} View as JSON</a>
+    </div>
+  </div>
+
+  <!-- Date hero -->
+  <div class="date-strip">
+    <div class="eyebrow">Daily Crop Market Prices</div>
+    <h1>${esc(displayDate)}</h1>
+    <div class="sub">${finalPrices.length} crops · ${isLatest ? 'Latest available data' : 'Today\'s prices'}</div>
+  </div>
+
+  <div class="wrap">
+
+    ${noDataMsg}
+
+    ${finalPrices.length > 0 ? `
+      <!-- Summary stats -->
+      ${statCards}
+
+      <!-- Price cards -->
+      <div class="section-label">All Crops</div>
+      <div class="card-grid">${priceCards}</div>
+
+      ${commentary || outlook ? `<div class="divider"></div>
+      <div class="insights">${commentaryBlock}${outlookBlock}</div>` : ''}
+    ` : ''}
+
+  </div>
+
+  <div class="footer">
+    Data provided by Farm with Irene &nbsp;·&nbsp;
+    <a href="${esc(jsonUrl)}">JSON endpoint</a> &nbsp;·&nbsp;
+    Updated daily by the admin
+  </div>
+
+</body>
+</html>`;
+
+  return c.html(html);
 });

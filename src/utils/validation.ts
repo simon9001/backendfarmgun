@@ -130,6 +130,17 @@ export const availabilitySchema = z.object({
   is_available: z.boolean().default(true),
 });
 
+export const cropPriceSchema = z.object({
+  crop_name:      z.string().min(2).max(100).regex(/^[a-zA-Z0-9\s\-'()]+$/, 'Only letters, numbers, spaces, hyphens, apostrophes and brackets'),
+  price_per_unit: z.number().positive().finite().max(10_000_000),
+  unit:           z.string().min(1).max(50).regex(/^[a-zA-Z0-9\s/\-]+$/, 'Invalid unit'),
+  market:         z.string().min(2).max(200).regex(/^[a-zA-Z0-9\s,\-'.()]+$/, 'Invalid market name'),
+  price_date:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
+  price_change:   z.number().finite().min(-100).max(10000).optional().nullable(),
+  commentary:     z.string().max(2000).optional().nullable(),
+  outlook:        z.string().max(1000).optional().nullable(),
+});
+
 export const partnerInterestSchema = z.object({
   company_name: z.string().min(2).max(255),
   contact_person: z.string().min(2).max(255),
